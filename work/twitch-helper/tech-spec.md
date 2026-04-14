@@ -18,11 +18,11 @@ Portable Electron 33+ (TypeScript) desktop app for Windows. The main process hos
 - **Electron Main Process** (`src/main/`) — app lifecycle, OAuth callback HTTP server, IPC handlers, bootstraps all backend services
 - **Twitch Client** (`src/main/twitch/`) — EventSub WebSocket connection + 60s keepalive watchdog, Channel Points REST API (create/list/fulfill/cancel rewards)
 - **FIFO Queue** (`src/main/queue/`) — processes redemption events sequentially, dispatches to action handlers, enforces max 5 active slots
-- **Mask Action Handler** (`src/main/actions/mask.ts`) — nut-js global hotkey simulation, 30s timer, remove-mask hotkey, IPC log emit
+- **Mask Action Handler** (`src/main/actions/mask.ts`) — robotjs global hotkey simulation, 30s timer, remove-mask hotkey, IPC log emit
 - **Media Action Handler** (`src/main/actions/media.ts`) — file resolution (specific or random from folder), WebSocket push to overlay with served HTTP media URL, playback_ended await with 120s timeout fallback, IPC log emit
 - **Overlay Server** (`src/main/overlay/`) — Express HTTP server on `127.0.0.1:7891`; serves overlay HTML page at `/overlay`; serves media files at `/media/:id` (temp registry keyed by uuid); `ws` WebSocket server for bidirectional messaging (play command → overlay, `playback_ended` ← overlay); WS nonce authentication
 - **Overlay Page** (`src/overlay/`) — transparent HTML/JS page for OBS Browser Source; authenticates via nonce; plays video with random position/angle within bounds, fixed size (400×300px); emits `playback_ended`
-- **Config Store** (`src/main/store/config.ts`) — typed JSON read/write for `config.json` using `PORTABLE_EXECUTABLE_DIR` (dev fallback: `path.dirname(app.getPath('exe'))`)
+- **Config Store** (`src/main/store/config.ts`) — typed JSON read/write for `config.json` using `PORTABLE_EXECUTABLE_DIR` (dev fallback: `process.cwd()` when `!app.isPackaged`); atomic writes (write to `.tmp`, then rename)
 - **Auth Store** (`src/main/store/auth.ts`) — stores access/refresh tokens in Windows Credential Manager via `keytar`; non-sensitive metadata (userId, expiresAt, broadcasterId) in `config.json`
 - **Renderer UI** (`src/renderer/`) — React app: auth screen, main layout (Snap Camera + Media sections), slot management, event log
 
@@ -86,10 +86,10 @@ TwitchClient or SlotService receives 401/403 →
 **Rationale:** Supports US requirement for portable Windows desktop app with browser-based overlay. Same Chromium engine as OBS Browser Source — overlay HTML behaves identically. `@nut-tree/nut-js` v4 requires Node.js 18+ (satisfied by Electron 28+). [TECHNICAL]
 **Alternatives considered:** Tauri rejected — requires native rebuild for keyboard simulation, smaller ecosystem; Python+PyInstaller rejected — slower startup, larger bundle.
 
-### Decision 2: @nut-tree/nut-js v4 for keyboard simulation
-**Decision:** `@nut-tree/nut-js` v4.2.0 (free, public npm) for global hotkey simulation.
-**Rationale:** Supports US requirement for mask hotkey simulation. v4 is the last freely available version on public npm. Ships prebuilt binaries for common platforms — no `electron-rebuild` step. Hotkey strings (e.g. `"ctrl+shift+1"`) are parsed into Key sequences at runtime.
-**Alternatives considered:** v5 rejected — moved to paid private registry; `robotjs` rejected — native C++ module requires rebuild on every Electron version bump.
+### Decision 2: robotjs for keyboard simulation
+**Decision:** `robotjs` v0.7.0 for global hotkey simulation. Requires `@electron/rebuild` after Electron version changes.
+**Rationale:** Supports US requirement for mask hotkey simulation. `robotjs` is a battle-tested, publicly available npm package with Windows Credential Manager support. v0.7.0 released March 2026. API: `robot.keyTap('1', ['control', 'shift'])`. Rebuild step is a one-time setup documented in Task 1.
+**Alternatives considered:** `@nut-tree/nut-js` v4 and v5 both rejected — do not exist on public npm (moved to paid private registry pkg.nutjs.dev); `ffi-napi` + raw `SendInput` rejected — verbose, no abstraction, Windows-only.
 
 ### Decision 3: Overlay as Express HTTP+WS server (not obs-websocket)
 **Decision:** Overlay page served by in-process Express server on `127.0.0.1:7891`, consumed by OBS as Browser Source URL. Media files served at `/media/:id`.
@@ -102,8 +102,9 @@ TwitchClient or SlotService receives 401/403 →
 **Alternatives considered:** Plaintext `auth.json` rejected — unacceptable if app folder is synced to Dropbox/OneDrive.
 
 ### Decision 5: PORTABLE_EXECUTABLE_DIR for config path
-**Decision:** Use `process.env.PORTABLE_EXECUTABLE_DIR` as base path for `config.json`. Dev fallback: `path.dirname(app.getPath('exe'))`.
-**Rationale:** Supports US portability requirement (settings survive exe replacement). `app.getPath('exe')` returns a temp extraction dir at runtime for portable builds — incorrect. `PORTABLE_EXECUTABLE_DIR` is the actual directory where `.exe` lives.
+**Decision:** Use `process.env.PORTABLE_EXECUTABLE_DIR` as base path for `config.json`. Dev fallback: `process.cwd()` when `!app.isPackaged`.
+**Rationale:** Supports US portability requirement (settings survive exe replacement). `app.getPath('exe')` returns a temp extraction dir at runtime for portable builds — incorrect for data storage. `PORTABLE_EXECUTABLE_DIR` is the actual directory where `.exe` lives. In dev mode `app.isPackaged` is false, so `process.cwd()` (project root) is used instead.
+**Alternatives considered:** `path.dirname(app.getPath('exe'))` rejected — in dev mode resolves to `node_modules/.bin` or system binary dir; `%APPDATA%` rejected — breaks portability requirement.
 
 ### Decision 6: Lens selection via snap-camera-server search
 **Decision:** Mask slot config uses `POST http://localhost:5645/vc/v1/explorer/search` (min 3 chars, debounced) to search lenses by name.
@@ -192,8 +193,9 @@ interface MediaRegistryEntry {
 ### New packages
 - `electron` v33+ — desktop app framework (Chromium + Node.js)
 - `react` + `react-dom` — renderer UI
-- `@nut-tree/nut-js` v4.2.0 — keyboard hotkey simulation (prebuilt binaries, free npm)
-- `keytar` — Windows Credential Manager access for OAuth token storage
+- `robotjs` v0.7.0 — keyboard hotkey simulation; native module, requires `@electron/rebuild`
+- `keytar` v7.9.0 — Windows Credential Manager for OAuth token storage; native module, requires `@electron/rebuild`
+- `@electron/rebuild` — rebuilds native modules against the installed Electron ABI
 - `express` — HTTP server for overlay page + media file serving
 - `ws` — WebSocket server (overlay push/receive) and client (Twitch EventSub)
 - `electron-builder` — portable `.exe` build
@@ -244,7 +246,8 @@ Agent verifies server-side logic and API contracts without a running stream. UI,
 
 | Risk | Mitigation |
 |------|-----------|
-| nut-js v4 prebuilt binary missing for Electron version | Pin Electron + nut-js versions; `Verify-smoke` in Task 8 confirms binary loads |
+| robotjs native binary missing for Electron version | Run `electron-rebuild` in Task 1 setup; `Verify-smoke` in Task 8 confirms binary loads; pin Electron version |
+| keytar archived (Dec 2022), prebuild may be missing for Electron 33 | Run `electron-rebuild` in Task 1; `Verify-smoke` in Task 2 confirms binary loads; fallback: build from source via `node-gyp` |
 | snap-camera-server not running at lens search time | Show inline error "snap-camera-server not found at localhost:5645" with setup link |
 | Twitch EventSub keepalive missed (no message 60s) | 60s watchdog closes and reconnects; queue pauses and resumes transparently |
 | OAuth callback port conflict (listen(0)) | OS assigns free port; callback URL updated dynamically in PKCE state |
@@ -257,6 +260,7 @@ Agent verifies server-side logic and API contracts without a running stream. UI,
 - **Lens selection UX:** user-spec says "выбирает линзу из списка snap-camera-server", tech-spec implements search-on-type (min 3 chars) instead of a full list. Reason: snap-camera-server has no getAllLenses endpoint. → [APPROVED BY USER]
 - **OBS integration via Browser Source URL (Decision 3):** user-spec implies a URL the user copies to OBS; tech-spec delivers this via Express HTTP server (not obs-websocket plugin). Reason: obs-websocket requires plugin install; Browser Source URL is simpler. → [APPROVED BY USER — user confirmed Browser Source approach in user-spec interview]
 - **Global remove-mask hotkey (Decision 8):** user-spec describes per-redemption mask removal after 30s; tech-spec implements this via a single global "remove mask hotkey" config field shared across all mask slots. Reason: Snap Camera has one "no filter" state. → [APPROVED BY USER — 30s removal behaviour confirmed in user-spec interview]
+- **auth.json replaced by keytar (Decision 4):** user-spec acceptance criterion says "`config.json` и `auth.json` сохраняются между перезапусками exe"; tech-spec eliminates `auth.json` and stores OAuth tokens in Windows Credential Manager via `keytar`. Non-sensitive metadata remains in `config.json`. Reason: refresh token in plaintext is a security risk for a portable app that may land in cloud-synced folders. User approved keytar during tech-spec clarification. → [APPROVED BY USER]
 
 ## Acceptance Criteria
 
@@ -279,16 +283,17 @@ Agent verifies server-side logic and API contracts without a running stream. UI,
 ### Wave 1 (независимые)
 
 #### Task 1: Project Infrastructure
-- **Description:** Initialize Electron 33+ + TypeScript + React project with Vite for renderer and overlay pages. Configure electron-builder for portable `.exe` target. Set up Jest for unit/integration tests, ESLint + Prettier, and folder structure (`src/main/`, `src/renderer/`, `src/overlay/`).
+- **Description:** Initialize Electron 33+ + TypeScript + React project with Vite for renderer and overlay pages. Configure electron-builder for portable `.exe` target. Set up `@electron/rebuild` for native modules (robotjs, keytar). Set up Jest for unit/integration tests, ESLint + Prettier, and folder structure (`src/main/`, `src/renderer/`, `src/overlay/`).
 - **Skill:** infrastructure-setup
 - **Reviewers:** code-reviewer, security-auditor, infrastructure-reviewer
 - **Verify-smoke:** `npm run build` → produces portable `.exe` in `dist/`; `npm test` → test runner starts (0 tests, no failures)
 - **Files to modify:** `package.json`, `electron-builder.config.js`, `vite.config.ts`, `tsconfig.json`, `.gitignore`
 
 #### Task 2: Config & Auth Store
-- **Description:** Typed JSON store for `config.json` using `PORTABLE_EXECUTABLE_DIR` (dev fallback: `path.dirname(app.getPath('exe'))`). `keytar`-backed `AuthStore` for access/refresh tokens; non-sensitive metadata in `config.json`. `SlotService` enforces max 5 slots.
+- **Description:** Typed JSON store for `config.json` using `PORTABLE_EXECUTABLE_DIR` (dev fallback: `process.cwd()`) with atomic writes (write to `.tmp`, rename). `keytar`-backed `AuthStore` for access/refresh tokens; non-sensitive metadata in `config.json`. `SlotService` enforces max 5 slots.
 - **Skill:** code-writing
 - **Reviewers:** code-reviewer, security-auditor, test-reviewer
+- **Verify-smoke:** `node -e "const keytar = require('keytar'); console.log(typeof keytar.getPassword)"` → prints `function` (confirms keytar native binary loads)
 - **Files to modify:** `src/main/store/config.ts`, `src/main/store/auth.ts`, `src/main/store/types.ts`, `src/main/slots/service.ts`
 
 #### Task 3: Overlay Server
@@ -310,7 +315,7 @@ Agent verifies server-side logic and API contracts without a running stream. UI,
 - **Files to read:** `src/main/store/auth.ts`
 
 #### Task 5: Twitch API Client + EventSub
-- **Description:** REST client for Channel Points API (create reward with cooldown, list via `only_manageable_rewards=true`, fulfill/cancel). EventSub WebSocket client per Decisions 6–7: connect, subscribe after `session_welcome`, handle `session_reconnect`, 60s keepalive watchdog, 401 triggers refresh/logout. Emits `twitch:status` IPC on connect/disconnect.
+- **Description:** REST client for Channel Points API (create reward with cooldown, list via `only_manageable_rewards=true`, fulfill/cancel) per Decision 7. Reward creation handles Twitch 400 (name conflict → surface error to UI), and orphan reward on config write failure (delete reward on rollback). EventSub WebSocket client: connect, subscribe after `session_welcome`, handle `session_reconnect`, 60s keepalive watchdog, 401 triggers refresh/logout. Emits `twitch:status` IPC on connect/disconnect.
 - **Skill:** code-writing
 - **Reviewers:** code-reviewer, security-auditor, test-reviewer
 - **Verify-smoke:** Integration test with Twitch CLI: `twitch event trigger channel-points-custom-reward-redemption-add` → event received by client
@@ -334,10 +339,10 @@ Agent verifies server-side logic and API contracts without a running stream. UI,
 - **Files to read:** `src/main/store/config.ts`, `src/main/twitch/client.ts`
 
 #### Task 8: Mask Action Handler
-- **Description:** Parses hotkey string (e.g. `"ctrl+shift+1"`) into nut-js Key sequence. Simulates apply-mask hotkey, waits 30s, simulates global remove-mask hotkey from config. Calls `fulfillRedemption` on success, `cancelRedemption` on error. Emits log entry via IPC.
+- **Description:** Parses hotkey string (e.g. `"ctrl+shift+1"`) into robotjs `keyTap(key, modifiers)` call. Simulates apply-mask hotkey, waits 30s, simulates global remove-mask hotkey from config. Calls `fulfillRedemption` on success, `cancelRedemption` on error. Emits log entry via IPC.
 - **Skill:** code-writing
 - **Reviewers:** code-reviewer, test-reviewer
-- **Verify-smoke:** `node -e "const {keyboard} = require('@nut-tree/nut-js'); console.log(typeof keyboard.type)"` → prints `function` (confirms nut-js binary loads in Node context)
+- **Verify-smoke:** `node -e "const robot = require('robotjs'); console.log(typeof robot.keyTap)"` → prints `function` (confirms robotjs binary loads in Node context)
 - **Files to modify:** `src/main/actions/mask.ts`, `src/main/actions/hotkey-parser.ts`
 - **Files to read:** `src/main/store/config.ts`, `src/main/twitch/api.ts`
 
