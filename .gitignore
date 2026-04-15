@@ -1,0 +1,55 @@
+# Environment variables and secrets (CRITICAL - MUST ignore)
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials.json
+secrets/
+config.json
+auth.json
+.secrets/
+*api-key*
+*apikey*
+*secret*
+
+# Local settings (not shared)
+.claude/settings.local.json
+
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+!work/**/logs/
+
+# Test coverage
+coverage/
+.coverage
+htmlcov/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
