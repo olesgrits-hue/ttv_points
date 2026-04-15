@@ -1,0 +1,147 @@
+{
+  "status": "fail",
+  "sources": {
+    "user_spec": true,
+    "tech_spec": true,
+    "tasks": false
+  },
+  "requirements_total": 26,
+  "requirements_covered": 21,
+  "requirements_partial": 3,
+  "requirements_missing": 2,
+  "findings": [
+    {
+      "id": "F-01",
+      "type": "gap",
+      "source": "user-spec",
+      "requirement": "US-24: Maximum 5 slots across Snap Camera + Media sections (MVP constraint)",
+      "detail": "Tech-spec data model defines `slots: Slot[]` with no length constraint. No validation in SlotService, dispatcher, or UI is described anywhere. No unit test for the 5-slot cap is listed in the Testing Strategy. The constraint is stated explicitly in user-spec Ограничения section ('максимум 5 слотов (секция Snap Camera + секция Media)') but is fully absent from the tech-spec.",
+      "severity": "critical"
+    },
+    {
+      "id": "F-02",
+      "type": "gap",
+      "source": "user-spec",
+      "requirement": "US-19: On Twitch WebSocket loss — show notification 'Соединение потеряно, переподключаюсь...'; auto-reconnect; queue and settings not reset",
+      "detail": "The Risks table mentions a 60s keepalive watchdog for EventSub session expiry, and the Architecture diagram shows reconnect logic in TwitchClient. However: (1) the IPC path from reconnect event to the UI notification banner is not described anywhere — Task 10 mentions a 'connection status indicator' without specifying the IPC event name, state transitions (connected/reconnecting/connected), or the required notification text; (2) queue preservation is implicit (Queue is a singleton) but not stated as an explicit design invariant — the spec does not guarantee the queue is not cleared on reconnect.",
+      "severity": "critical"
+    },
+    {
+      "id": "F-03",
+      "type": "undocumented_deviation",
+      "source": "tech-spec",
+      "requirement": "Decision 3: Overlay served as Express HTTP+WS — marked [TECHNICAL] but absent from User-Spec Deviations",
+      "detail": "Decision 3 is marked [TECHNICAL] and describes a non-trivial UX-impacting choice: serving the overlay via an in-process Express server on port 7891 rather than via obs-websocket or a second Electron window. This choice directly affects the user-observable OBS setup flow (URL-based vs plugin-based). Per the methodology, [TECHNICAL] decisions that are not pure infrastructure must appear in User-Spec Deviations. The User-Spec Deviations section contains only the lens-search UX entry — Decision 3 is absent.",
+      "severity": "critical"
+    },
+    {
+      "id": "F-04",
+      "type": "undocumented_deviation",
+      "source": "tech-spec",
+      "requirement": "Decision 7: Single global remove-mask hotkey (not per-slot) — marked [TECHNICAL] but absent from User-Spec Deviations",
+      "detail": "Decision 7 is marked [TECHNICAL]: a single global 'Remove mask hotkey' setting in config, shared across all mask slots. The user-spec describes mask slot setup as having a per-lens hotkey ('вводит hotkey назначенный этой линзе в Snap Camera'). The user-spec does not specify whether the 'no filter' hotkey is global or per-slot. Implementing it as a single global setting changes the UI of slot configuration. This decision is absent from User-Spec Deviations.",
+      "severity": "critical"
+    },
+    {
+      "id": "F-05",
+      "type": "underengineering",
+      "source": "tech-spec",
+      "requirement": "US-14 / US-15: WebSocket push `{type:'play', filePath}` to overlay for media playback",
+      "detail": "Task 9 (Media Action Handler) pushes `{type:'play', filePath}` where filePath is an absolute Windows path (e.g. `C:\\Users\\...\\video.mp4`). The overlay page runs inside OBS Browser Source — a sandboxed Chromium context that cannot access arbitrary local filesystem paths via `file://` or direct path reference. The overlay needs the media file served over HTTP. The Overlay Server (Task 3) only describes serving `overlay/index.html` — no static file serving or dynamic media endpoint for local files is described anywhere in the spec. This is a functional gap that would prevent media playback from working entirely.",
+      "severity": "critical"
+    },
+    {
+      "id": "F-06",
+      "type": "partial",
+      "source": "user-spec",
+      "requirement": "US-3: Auto-show login screen when token expired or revoked",
+      "detail": "Task 4 covers the startup-time case ('validate token, auto-show login screen if expired/invalid'). AuthData has `expiresAt` for local expiry check. However: the tech-spec does not specify what happens if the token is revoked mid-session (e.g. user revokes app access in Twitch settings while streaming). The TwitchClient and Twitch API tasks do not describe handling 401/403 responses from Channel Points API calls during an active session, nor routing back to the login screen on mid-session auth failure.",
+      "severity": "major"
+    },
+    {
+      "id": "F-07",
+      "type": "partial",
+      "source": "user-spec",
+      "requirement": "US-5 / US-10: Event log — MaskAction must emit IPC log entry",
+      "detail": "Task 9 (Media Action Handler) explicitly says 'Emit log entry via IPC'. Task 8 (Mask Action Handler) has no such mention — the IPC path for logging mask action results (success green / error red) is absent from the task description and from the Architecture section's IPC handler list. The LogEntry model supports it, but the wire-up is unspecified for the mask flow.",
+      "severity": "major"
+    },
+    {
+      "id": "F-08",
+      "type": "partial",
+      "source": "user-spec",
+      "requirement": "US-26: Windows 10+ 64-bit, no admin rights required",
+      "detail": "nut-js v5 uses global keyboard hooks (SetWindowsHookExW / SendInput) which may require elevated permissions or UAC prompts on certain Windows 10 configurations, especially when target windows run at higher integrity levels. The tech-spec does not verify or assert that nut-js operates without admin rights on Windows 10+. This is not addressed in the Risks section despite being an explicit platform constraint in user-spec.",
+      "severity": "minor"
+    },
+    {
+      "id": "F-09",
+      "type": "underengineering",
+      "source": "tech-spec",
+      "requirement": "US-8: Create new Twitch reward from app (name, cost, cooldown)",
+      "detail": "Task 5 describes reward CRUD at a high level. Neither Task 5 nor Task 11 (Slot Management UI) specifies error handling for reward creation failures: name conflict on Twitch (reward with same name exists), API rate limits, invalid cooldown values, or partial success (reward created on Twitch but slot save to config.json fails leaving an orphan reward). For an L-size feature interacting with an external API, absence of an error strategy for the create-reward flow is a gap.",
+      "severity": "major"
+    },
+    {
+      "id": "F-10",
+      "type": "scope_creep",
+      "source": "tech-spec",
+      "requirement": "No corresponding user-spec requirement",
+      "detail": "Config interface exposes `overlayPort: number` as a user-configurable field (default 7891). The user-spec hardcodes 'http://localhost:7891/overlay' and does not mention a configurable port. Making this configurable adds UI surface and config complexity not requested by the user. If the port is only an internal constant, it should be a code constant, not a config field.",
+      "severity": "major"
+    },
+    {
+      "id": "F-11",
+      "type": "scope_creep",
+      "source": "tech-spec",
+      "requirement": "No corresponding user-spec requirement",
+      "detail": "AuthData interface stores `clientId: string` in auth.json. clientId is a compile-time OAuth app constant for this application — it does not change per user or per auth session. Persisting it in auth.json adds no user-facing value and introduces a consistency risk if the app is rebuilt with a different clientId while old auth.json exists with a stale value. User-spec does not mention clientId configuration. This is absent from User-Spec Deviations.",
+      "severity": "minor"
+    },
+    {
+      "id": "F-12",
+      "type": "underengineering",
+      "source": "tech-spec",
+      "requirement": "US-21: config.json and auth.json persist across restarts",
+      "detail": "ConfigStore and AuthStore perform JSON file reads/writes. The tech-spec does not specify atomic write semantics (write-to-temp + rename). Node.js `fs.writeFile` is not atomic — a crash mid-write leaves a corrupt file. Unit tests cover 'corrupt JSON returns defaults' (recovery), but the spec does not require atomic writes to prevent corruption in the first place. For an app storing user configuration this is a robustness gap.",
+      "severity": "minor"
+    },
+    {
+      "id": "F-13",
+      "type": "documented_deviation",
+      "source": "tech-spec",
+      "requirement": "US-9: Lens selection from snap-camera-server list",
+      "detail": "User-spec says 'выбирает линзу из списка snap-camera-server'. Tech-spec implements search-on-type (min 3 chars) instead of a browseable full list. Deviation is documented in User-Spec Deviations section and marked APPROVED BY USER during clarification. Correctly handled — downgraded from scope_creep.",
+      "severity": "minor"
+    }
+  ],
+  "traceability_matrix": {
+    "US-1":  { "description": "OAuth login via Twitch (PKCE, scopes)", "status": "covered", "covered_by": "Decision 1, Task 4, AuthData model, pkce-challenge dep" },
+    "US-2":  { "description": "Token saved in auth.json next to .exe; auto-login on next launch", "status": "covered", "covered_by": "Decision 4, AuthStore, Task 2, Task 4" },
+    "US-3":  { "description": "Auto-show login screen when token expired or revoked", "status": "partial", "covered_by": "Task 4 (startup check only)", "finding": "F-06" },
+    "US-4":  { "description": "Main screen: Snap Camera + Media sections, event log", "status": "covered", "covered_by": "Architecture, Task 10" },
+    "US-5":  { "description": "Event log: time/viewer/reward/green-red icon; red tooltip", "status": "partial", "covered_by": "LogEntry model, Task 10 (EventLog); MaskAction IPC path missing", "finding": "F-07" },
+    "US-6":  { "description": "OBS URL displayed at top of screen", "status": "covered", "covered_by": "Task 10 MainScreen (OBS URL text display)" },
+    "US-7":  { "description": "Add slot: type picker Mask/Media/Meme", "status": "covered", "covered_by": "Task 11 SlotForm (type picker)" },
+    "US-8":  { "description": "Reward binding: create new (name, cost, cooldown) or choose existing manageable", "status": "covered", "covered_by": "Decision 6, Task 5 REST client, Task 11 SlotForm" },
+    "US-9":  { "description": "Mask slot: lens from snap-camera-server + hotkey + UI hint", "status": "covered", "covered_by": "Decision 5, MaskSlot model, Task 6, Task 11 LensSearch (hotkey input + tooltip)" },
+    "US-10": { "description": "Media slot: file path via file picker dialog", "status": "covered", "covered_by": "MediaSlot model, Task 11" },
+    "US-11": { "description": "Meme slot: folder path via folder picker dialog", "status": "covered", "covered_by": "MemeSlot model, Task 11" },
+    "US-12": { "description": "Slot toggle enable/disable without losing config", "status": "covered", "covered_by": "BaseSlot.enabled, Task 11" },
+    "US-13": { "description": "FIFO queue for simultaneous redemptions", "status": "covered", "covered_by": "FIFO Queue, Task 7, Unit tests" },
+    "US-14": { "description": "Media/Meme: push file to overlay via WebSocket, random position/angle, fixed size", "status": "missing", "covered_by": "Task 9 describes push but file serving to browser is not addressed", "finding": "F-05" },
+    "US-15": { "description": "Overlay signals playback_ended; fulfill after signal or 120s timeout", "status": "covered", "covered_by": "Task 9, Integration tests, 120s timeout unit test" },
+    "US-16": { "description": "Media/Meme error (file not found, empty folder): cancel + red log", "status": "covered", "covered_by": "Task 9, Task 7 dispatcher error catch, MediaAction unit tests" },
+    "US-17": { "description": "Mask flow: simulate hotkey, wait 30s, simulate remove-mask hotkey", "status": "covered", "covered_by": "Decision 2, Decision 7, MaskAction, Task 8" },
+    "US-18": { "description": "Mask flow: fulfill after 30s, green log", "status": "covered", "covered_by": "MaskAction fulfill, Task 8" },
+    "US-19": { "description": "Reconnect on Twitch loss: notification, auto-reconnect, preserve queue/settings", "status": "missing", "covered_by": "Watchdog in Risks, session_reconnect in Task 5; UI notification path and queue invariant unspecified", "finding": "F-02" },
+    "US-20": { "description": "Overlay transparent when no active playback", "status": "covered", "covered_by": "Task 3 (transparent background), Acceptance Criteria" },
+    "US-21": { "description": "config.json and auth.json persist across restarts", "status": "covered", "covered_by": "ConfigStore, AuthStore, Task 2, Integration test" },
+    "US-22": { "description": "snap-camera-server unavailable: show error with instructions", "status": "covered", "covered_by": "Task 6 (graceful unavailable), Risks table" },
+    "US-23": { "description": "Portability: any folder, no install, data files next to .exe", "status": "covered", "covered_by": "Decision 4, PORTABLE_EXECUTABLE_DIR, electron-builder portable target" },
+    "US-24": { "description": "Max 5 slots (Snap Camera + Media sections)", "status": "missing", "covered_by": "Not addressed anywhere in tech-spec", "finding": "F-01" },
+    "US-25": { "description": "No auto-update in MVP", "status": "covered", "covered_by": "Implicit — no auto-update mechanism present in spec" },
+    "US-26": { "description": "Windows 10+ 64-bit, no admin rights", "status": "partial", "covered_by": "electron-builder portable target; nut-js admin rights risk not addressed", "finding": "F-08" }
+  },
+  "summary": "21/26 requirements covered, 3 partial, 2 missing (US-14 media file HTTP serving gap, US-24 5-slot cap, US-19 reconnect notification/queue invariant). 5 critical findings: missing 5-slot enforcement; missing reconnect UI notification and queue preservation guarantee; Decision 3 ([TECHNICAL]) and Decision 7 ([TECHNICAL]) absent from User-Spec Deviations; functional gap where absolute Windows file paths pushed to OBS Browser Source overlay cannot be loaded by the sandboxed Chromium context — an HTTP media-serving endpoint is required but not described. Additional major findings: mid-session token revocation not handled; MaskAction IPC log emission unspecified; reward creation error handling absent; overlayPort as configurable field is scope creep not requested by user. Tech-spec has substantive technical content and is not shallow. Status: FAIL — 5 critical findings require resolution before implementation."
+}

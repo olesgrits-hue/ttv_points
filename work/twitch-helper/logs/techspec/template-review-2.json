@@ -1,0 +1,42 @@
+{
+  "status": "approved",
+  "round1_fixes": {
+    "task11_moved_to_wave5": {
+      "result": "pass",
+      "note": "Task 11 is now in Wave 5 (depends on Wave 4). Wave 4 contains Task 10. No wave conflict."
+    },
+    "decision_details_removed_from_tasks": {
+      "result": "pass",
+      "note": "Tasks 3, 5, 6 now use 'per Decision N' cross-references only. No embedded rationale or alternatives text found in task descriptions."
+    },
+    "verify_smoke_task8": {
+      "result": "pass",
+      "note": "Task 8 has concrete Verify-smoke: `node -e \"const {keyboard} = require('@nut-tree/nut-js'); console.log(typeof keyboard.type)\"` confirming nut-js binary loads."
+    },
+    "verify_smoke_task4": {
+      "result": "pass",
+      "note": "Task 4 has Verify-smoke (OS port allocation check) and Verify-user (browser login flow). Both present."
+    }
+  },
+  "findings": [
+    {
+      "severity": "minor",
+      "category": "structure",
+      "issue": "Decision 5 (PORTABLE_EXECUTABLE_DIR) is missing the 'Alternatives considered' subsection. All other decisions include it; this one ends after Rationale.",
+      "fix": "Add 'Alternatives considered: app.getPath(\"exe\") rejected — returns temp extraction dir for portable builds, not the actual exe location.' to Decision 5."
+    },
+    {
+      "severity": "minor",
+      "category": "tasks",
+      "issue": "Task 2 (Config & Auth Store) has no Verify-smoke. `keytar` is a native Node addon with prebuilt binaries — same binary-load risk as nut-js (covered by Verify-smoke in Task 8). A failed keytar binary would silently break all auth.",
+      "fix": "Add Verify-smoke: `node -e \"const keytar = require('keytar'); console.log(typeof keytar.getPassword)\"` → prints `function`."
+    },
+    {
+      "severity": "minor",
+      "category": "tasks",
+      "issue": "Task 5 description references 'per Decisions 6–7', but Decision 6 is exclusively about snap-camera-server lens search (which belongs to Task 6). Task 5 is about Channel Points API + EventSub — only Decision 7 (only_manageable_rewards=true) applies.",
+      "fix": "Change 'per Decisions 6–7' to 'per Decision 7' in Task 5 description."
+    }
+  ],
+  "summary": "All four round-1 issues are resolved: Task 11 is correctly placed in Wave 5 with no wave conflicts; decision details are absent from task descriptions in Tasks 3, 5, and 6; Verify-smoke is present and concrete in both Task 8 (nut-js binary) and Task 4 (OS port allocation). Three minor findings remain: Decision 5 missing alternatives, Task 2 missing keytar binary smoke check, and an imprecise Decision cross-reference in Task 5. No critical findings — status is approved."
+}

@@ -1,0 +1,101 @@
+{
+  "status": "changes_required",
+  "summary": {
+    "totalFindings": 9,
+    "critical": 2,
+    "major": 4,
+    "minor": 3
+  },
+  "findings": [
+    {
+      "severity": "critical",
+      "category": "A02: Cryptographic Failures",
+      "title": "OAuth tokens stored in plaintext auth.json",
+      "description": "The auth.json file stores accessToken, refreshToken, clientId, userId, and broadcasterId in plaintext JSON next to the executable. While this is a personal tool, the refresh token is a long-lived credential that grants full access to the Twitch channel management scope (channel:manage:redemptions). Any process or user with filesystem read access to the exe directory can steal the refresh token and permanently control the channel's rewards — including creating fraudulent redemptions or canceling all existing ones. The threat model for a desktop app includes malware, other local users, and accidental sync to cloud storage (Dropbox, OneDrive, iCloud) which are common locations for portable apps.",
+      "location": "Section: Data Models / auth.json, Task 2: Config & Auth Store",
+      "impact": "Stolen refresh token allows an attacker to permanently impersonate the streamer to the Twitch API: create/delete channel point rewards, fulfill/cancel redemptions on behalf of the channel, extract broadcaster ID for further targeting. Token remains valid until manually revoked.",
+      "recommendation": "Use the OS credential store instead of a plain file: Windows Credential Manager via `keytar` (npm) or `windows-credentials` stores secrets encrypted with the user's Windows login key. Store only non-sensitive metadata (userId, broadcasterId, expiresAt) in auth.json; store accessToken and refreshToken via `keytar.setPassword('twitch-helper', 'tokens', JSON.stringify({accessToken, refreshToken}))`. If keytar is rejected for complexity, at minimum document the risk prominently and add a .gitignore / .cloudignore entry, and warn the user in the README not to store the exe in synced folders.",
+      "cwe": "CWE-312"
+    },
+    {
+      "severity": "critical",
+      "category": "A03: Injection",
+      "title": "Path traversal via unvalidated filePath in MediaAction WebSocket push",
+      "description": "MediaAction resolves a filePath from config (MediaSlot.filePath or a random file from MemeSlot.folderPath) and pushes it to the overlay page as `{type:\"play\", filePath}`. The overlay page in OBS Browser Source then uses this path to construct a media src attribute. There is no spec'd validation that the resolved path stays within the configured directory. For MemeSlot (random file from folder), if the folder enumeration returns symlinks or relative path components, the resolved path could escape the intended directory. More critically, the filePath value is stored in config.json which is a writable plaintext file — if an attacker can write to config.json (e.g. via a separate vulnerability or direct access), they can set filePath to any file on the system. The overlay page receiving `filePath` and constructing a file:// or src URL without sanitization completes the injection chain.",
+      "location": "Section: Data Models / MediaSlot.filePath, Task 9: Media Action Handler, src/main/actions/media.ts",
+      "impact": "In the worst case (malicious config.json modification + overlay page using path directly in DOM), an attacker could cause the overlay to load and display arbitrary local files. Even without DOM injection, unrestricted path resolution leaks the existence and content of files outside the media directory.",
+      "recommendation": "1. After resolving a file path in MediaAction, validate it with `path.resolve()` and assert it starts with the configured base directory: `if (!resolved.startsWith(path.resolve(slot.folderPath))) throw new Error('Path traversal detected')`. 2. In the overlay page, never use filePath directly as a file:// URL in a src attribute — send only a filename token, and have the Express server resolve and serve it with range-request support from a known safe directory. 3. Add an allowlist of permitted file extensions (e.g. .mp4, .webm, .gif) and reject others.",
+      "cwe": "CWE-22"
+    },
+    {
+      "severity": "major",
+      "category": "A03: Injection",
+      "title": "WebSocket messages from overlay page accepted without schema validation",
+      "description": "The overlay server receives WebSocket messages from the OBS Browser Source overlay page (e.g. `{type:\"playback_ended\"}`). The tech spec does not define any message schema validation on the server side for incoming messages. The overlay page runs in OBS Browser Source — a Chromium-based environment where JavaScript can be injected via browser extensions, OBS scripts, or a compromised overlay HTML. An attacker who can send a crafted WebSocket message (e.g. by connecting to ws://localhost:7891 from any local process, since the server is on localhost with no authentication) could send unexpected message types or malformed payloads that trigger unhandled code paths in the main process.",
+      "location": "Section: Architecture / Overlay Server, Task 3: Overlay Server, src/main/overlay/server.ts",
+      "impact": "Any local process can connect to ws://localhost:7891 and send arbitrary messages. Without validation, malformed or unexpected message types could cause unhandled promise rejections, crash the queue processing loop, or trigger fulfill/cancel actions out of sequence (e.g. sending a spurious playback_ended to prematurely end a media slot).",
+      "recommendation": "1. Validate all incoming WebSocket messages against a strict schema before processing: only accept `{type: 'playback_ended'}` — reject and log any other type or malformed JSON. 2. Add origin validation: check the `Origin` header on WebSocket upgrade requests; only accept connections from `null` (file://) or `http://localhost:7891` (self-served overlay). 3. Consider adding a session token: when the overlay page is served, embed a random nonce in the HTML; require the overlay to send this nonce in its first WebSocket message before any other messages are accepted.",
+      "cwe": "CWE-20"
+    },
+    {
+      "severity": "major",
+      "category": "A01: Broken Access Control",
+      "title": "Overlay WebSocket server accepts connections from any local process",
+      "description": "The Express+ws server on port 7891 has no authentication. Any process running on localhost (malware, other apps, browser tabs via WebSocket) can connect to ws://localhost:7891 and send messages that the main process will act on. The tech spec does not define any access control for the WebSocket upgrade path. This is particularly relevant because the server is always running while the app is open, and the port (7891) is fixed and predictable.",
+      "location": "Section: Architecture / Overlay Server, Decision 3, Task 3: Overlay Server",
+      "impact": "A malicious local process or browser tab (via JavaScript WebSocket to localhost) can: send spurious playback_ended messages to advance the queue prematurely; flood the server to exhaust the event queue; potentially trigger fulfill/cancel API calls for in-flight redemptions by manipulating timing.",
+      "recommendation": "1. Implement a connection secret: on server start, generate a cryptographically random token (crypto.randomBytes(32).toString('hex')). Embed this token in the served overlay HTML page as a global variable. Require the overlay client to send `{type:'auth', token: SECRET}` as its first message; close the connection if it does not. 2. Enforce a single-connection policy: only one WebSocket client is ever expected (the OBS Browser Source); reject additional connections. 3. The HTTP overlay endpoint does not need these controls since it only serves static content, but should not expose any API endpoints.",
+      "cwe": "CWE-306"
+    },
+    {
+      "severity": "major",
+      "category": "A04: Insecure Design",
+      "title": "IPC handlers expose privileged actions to renderer without input sanitization spec",
+      "description": "The renderer process communicates with the main process via Electron IPC (ipcMain/ipcRenderer). The tech spec lists IPC for: triggering OAuth login, saving config (slots, hotkeys), initiating file/folder picker dialogs, and receiving log updates. In Electron, a compromised renderer (e.g. via XSS in the React UI loading external data, or a supply chain attack on a renderer dependency) can call any exposed ipcMain handler. The spec does not define input validation on IPC handler parameters. Specifically, the slot save handler will receive user-controlled filePath and folderPath values that later flow into MediaAction's file resolution logic. If the renderer is compromised, it can supply crafted paths directly via IPC.",
+      "location": "Section: Architecture / Renderer UI, Task 11: Slot Management UI, src/main/ipc/auth.ts",
+      "impact": "A compromised renderer can: save arbitrary file paths into config (enabling path traversal in MediaAction), trigger OAuth token refresh flows, and potentially access any IPC-exposed functionality without UI-level constraints. Electron's contextIsolation and sandbox do not protect against a fully compromised renderer script.",
+      "recommendation": "1. Enable `contextIsolation: true` and `sandbox: true` in the BrowserWindow webPreferences (spec should mandate this explicitly). 2. Use a preload script to expose only a minimal, typed API surface via contextBridge — never expose ipcRenderer.invoke directly. 3. Re-validate all IPC inputs in the main process handler, not just in the renderer: validate filePath/folderPath with path.resolve() and assert they are absolute paths pointing to user-accessible locations. 4. Disable `nodeIntegration` in the renderer (should be false by default in Electron 33, but spec should explicitly confirm this).",
+      "cwe": "CWE-284"
+    },
+    {
+      "severity": "major",
+      "category": "A05: Security Misconfiguration",
+      "title": "Overlay HTTP server binding not explicitly restricted to localhost",
+      "description": "The tech spec states the Express server runs on port 7891 but does not explicitly specify that it must bind to 127.0.0.1 only (not 0.0.0.0). Express by default binds to all network interfaces (0.0.0.0) unless explicitly configured otherwise. If the server binds to 0.0.0.0, the overlay WebSocket and HTTP server are accessible from the local network — any device on the same Wi-Fi or LAN can access ws://STREAMER_IP:7891 and send messages, or access the overlay URL directly.",
+      "location": "Decision 3: Overlay as Express HTTP+WS, Task 3: Overlay Server, src/main/overlay/server.ts",
+      "impact": "Network-adjacent attackers (same Wi-Fi, coffee shop, home network with other devices) can connect to the WebSocket server and send playback_ended messages, disrupting the redemption queue. They can also repeatedly request the overlay endpoint, causing unnecessary load.",
+      "recommendation": "Explicitly bind the Express server to 127.0.0.1: `server.listen(port, '127.0.0.1', callback)`. Add this as an explicit requirement in the tech spec for Task 3. The OBS Browser Source connects via localhost, so binding to 127.0.0.1 does not affect functionality.",
+      "cwe": "CWE-668"
+    },
+    {
+      "severity": "minor",
+      "category": "A09: Security Logging and Monitoring",
+      "title": "Auth events and token operations not included in audit logging spec",
+      "description": "The event log spec covers redemption success/failure entries but does not include security-relevant events: OAuth token acquisition, token refresh, token validation failure on startup, or auth.json read/write operations. These events are important for the user to detect unexpected authentication activity (e.g. if auth.json was read by another process between runs).",
+      "location": "Section: Data Models / LogEntry, Task 4: Twitch OAuth",
+      "impact": "Without logging of auth events, unexpected token invalidation or repeated re-auth flows are invisible to the user. Debugging auth issues in production becomes difficult.",
+      "recommendation": "Add auth events to the in-memory log or a separate debug log: 'Token validated on startup', 'Token refreshed', 'Token validation failed — showing login screen'. These do not need to be persisted but should be visible in the event log or console output during a session.",
+      "cwe": "CWE-778"
+    },
+    {
+      "severity": "minor",
+      "category": "A05: Security Misconfiguration",
+      "title": "No Content Security Policy defined for overlay HTML page",
+      "description": "The overlay page (src/overlay/index.html) is served by Express and loaded in OBS Browser Source. The tech spec does not define Content-Security-Policy headers for this page. Without CSP, if the overlay page is ever modified to include dynamic content (e.g. displaying viewer names in future features), XSS would have no mitigation layer. Additionally, OBS Browser Source may have different security defaults than a standard browser.",
+      "location": "Task 3: Overlay Server, src/overlay/index.html",
+      "impact": "Absence of CSP is a defense-in-depth gap. Current functionality (static video playback) has low direct risk, but future changes to display user-controlled content (viewer names, reward titles) without CSP would immediately introduce XSS risk.",
+      "recommendation": "Add to the Express server for all overlay responses: `res.setHeader('Content-Security-Policy', \"default-src 'self'; media-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'\")`. Also add `X-Content-Type-Options: nosniff`. This is low-cost and establishes a safe baseline.",
+      "cwe": "CWE-1021"
+    },
+    {
+      "severity": "minor",
+      "category": "A04: Insecure Design",
+      "title": "snap-camera-server API called over HTTP without integrity verification",
+      "description": "Task 6 specifies an HTTP client that calls `POST http://localhost:5645/vc/v1/explorer/search`. This is plain HTTP (not HTTPS), and the response (lens list) is used to populate the mask slot config — specifically lensId and lensName values that are stored in config.json. There is no spec for validating or sanitizing the response from snap-camera-server. If snap-camera-server is replaced by a malicious process bound to port 5645, it could return crafted lensId/lensName values.",
+      "location": "Task 6: snap-camera-server Lens Search, src/main/snap/search.ts",
+      "impact": "A process spoofing snap-camera-server on port 5645 could inject crafted lensId or lensName strings into config.json. The lensName is a display string (low risk); lensId is used to construct hotkey sequences — a crafted value here is unlikely to cause code execution but could cause unexpected hotkey simulation behavior.",
+      "recommendation": "1. Validate the response schema from snap-camera-server: assert that lensId is a non-empty alphanumeric string and lensName is a plain string with a reasonable length limit (e.g. 100 chars). 2. Sanitize lensName before displaying in the renderer to prevent XSS if React rendering is ever done with dangerouslySetInnerHTML. Since snap-camera-server is localhost-only and user-controlled, risk is low, but schema validation is cheap.",
+      "cwe": "CWE-20"
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "status": "changes_required",
+  "summary": {
+    "totalFindings": 10,
+    "critical": 3,
+    "major": 4,
+    "minor": 3
+  },
+  "findings": [
+    {
+      "severity": "critical",
+      "category": "A01: Broken Access Control / Path Traversal",
+      "title": "MediaSlot path traversal check is tautological — any filesystem path accepted",
+      "description": "src/main/actions/media.ts:28-30: For MediaSlot, baseDir is set to path.dirname(resolved), which is always the immediate parent of the file itself. validatePath(resolved, baseDir) therefore always passes because every file is trivially within its own parent directory. A renderer-supplied filePath of any arbitrary path (e.g. C:\\Windows\\System32\\sam, /etc/passwd) will pass validation unchanged. The file will be registered in the overlay registry and served via HTTP GET /media/:id to any browser client, disclosing its content.",
+      "location": "src/main/actions/media.ts:28-30",
+      "impact": "Arbitrary file read from the host filesystem. An attacker with renderer compromise (e.g. via malicious IPC call) can exfiltrate any file readable by the Electron process.",
+      "recommendation": "Define an application-level allowed base directory (e.g. a user-configured media folder stored in config.json) and validate all filePath values against it. Example fix:\n  const ALLOWED_BASE = configStore.read().mediaBaseDir; // e.g. user's media folder\n  const resolved = path.normalize(path.resolve(slot.filePath));\n  validatePath(resolved, ALLOWED_BASE); // rel must not start with '..'",
+      "cwe": "CWE-22"
+    },
+    {
+      "severity": "critical",
+      "category": "A01: Broken Access Control / IPC Input Validation",
+      "title": "slots:create accepts arbitrary unvalidated renderer payload — prototype pollution and type confusion",
+      "description": "src/main/ipc/slots.ts:15-18: The payload parameter typed as Omit<Slot, 'id'> is spread directly into a new object without any runtime field validation before being passed to slotService.addSlot(). The TypeScript type is erased at runtime. A malicious renderer can pass: __proto__, constructor.prototype, arbitrary extra fields, or a type value outside the union ('mask'|'media'|'meme'). The slot object is then persisted to config.json and later consumed by MediaAction and MaskAction. No Zod/JSON-Schema validation or allow-list field sanitization is present.",
+      "location": "src/main/ipc/slots.ts:15-18",
+      "impact": "Prototype pollution of the main process Object prototype; injection of unexpected slot types that may trigger unhandled code paths; dirty-write of arbitrary keys into config.json; potential OS command execution if a slot type is added that invokes shell utilities with slot fields.",
+      "recommendation": "Validate the incoming payload with a strict schema before using it. Use zod or a manual allow-list:\n  const ALLOWED_TYPES = new Set(['mask','media','meme']);\n  if (!ALLOWED_TYPES.has(payload?.type)) throw new Error('invalid type');\n  // validate all required fields per type, reject extra keys\n  const safe = Object.create(null); // no prototype inheritance",
+      "cwe": "CWE-1321"
+    },
+    {
+      "severity": "critical",
+      "category": "A06: Vulnerable Components",
+      "title": "Electron ^33.2.1 has 14+ high-severity CVEs including IPC spoofing, ASAR bypass, and registry injection",
+      "description": "package.json: The installed Electron version range ^33.2.1 is affected by at least 14 high-severity advisories confirmed by npm audit, including: GHSA-xj5x-m3f3-5x3h (service worker can spoof executeJavaScript IPC replies), GHSA-vmqv-hx8q-j7mg (ASAR integrity bypass), GHSA-mwmh-mq4g-g6gr (registry key path injection in setAsDefaultProtocolClient on Windows — directly relevant to this Windows app), GHSA-9wfr-w7mm-pc7f (renderer command-line switch injection via commandLineSwitches webPreference), and multiple use-after-free vulnerabilities.",
+      "location": "package.json: electron@^33.2.1",
+      "impact": "An attacker exploiting GHSA-xj5x-m3f3-5x3h can forge IPC replies in the renderer to appear as main-process responses, bypassing contextIsolation protections. GHSA-mwmh-mq4g-g6gr allows integrity bypass of packaged ASAR archives.",
+      "recommendation": "Update Electron to the latest stable release in the 33.x or 34.x line (check https://releases.electronjs.org/ for the most recent patch). Pin to an exact version that has no outstanding high/critical advisories: npm install electron@<patched-version> --save-dev",
+      "cwe": "CWE-1395"
+    },
+    {
+      "severity": "major",
+      "category": "A07: Auth Failures — Null Dereference in auth:check Handler",
+      "title": "auth:check destructures null getTokens() result — crashes IPC handler on first launch",
+      "description": "src/main/ipc/auth.ts:21: const { accessToken } = await authStore.getTokens() — getTokens() is typed Promise<Tokens | null> (store/auth.ts:57) and returns null when no tokens are stored (first launch, after logout). Destructuring null throws TypeError: Cannot destructure property 'accessToken' of null. The unhandled IPC error propagates to the renderer as an opaque rejection. This is not merely a UX bug — it means the auth state is indeterminate after errors, potentially leaving the renderer in a permanently broken state.",
+      "location": "src/main/ipc/auth.ts:21",
+      "impact": "Denial of service of the authentication IPC channel on first launch or after logout. Renderer cannot determine auth state and may behave unpredictably.",
+      "recommendation": "Null-guard the result:\n  const tokens = await authStore.getTokens();\n  if (!tokens?.accessToken) return false;\n  return !authStore.isTokenExpired(cfg);",
+      "cwe": "CWE-476"
+    },
+    {
+      "severity": "major",
+      "category": "A07: Auth Failures — WebSocket Nonce Reuse",
+      "title": "WebSocket nonce is not invalidated after first successful authentication",
+      "description": "src/main/overlay/server.ts:220-235: After a client authenticates with the correct nonce, this.currentNonce is NOT set to null. The same nonce remains valid indefinitely until generateNonce() is called again. Any subsequent WebSocket connection from any source that has observed the nonce (e.g. from a browser tab that captured the overlay URL query string, or a local process) can authenticate and send play commands or receive playback control.",
+      "location": "src/main/overlay/server.ts:220-235",
+      "impact": "A second WebSocket client can authenticate with the same nonce and displace the legitimate overlay client (the 'replace previous client' logic at line 227 actually amplifies this — the attacker terminates the legitimate OBS session). The attacker can then send or suppress play commands.",
+      "recommendation": "Invalidate the nonce immediately after successful authentication:\n  // After line 224 (authenticated = true):\n  this.currentNonce = null; // one-time use",
+      "cwe": "CWE-294"
+    },
+    {
+      "severity": "major",
+      "category": "A01: Broken Access Control — IPC Input Validation",
+      "title": "slots:toggle and slots:delete accept unvalidated id from renderer — no type or format check",
+      "description": "src/main/ipc/slots.ts:20-31: Both slots:delete and slots:toggle receive an id (string) or payload from the renderer with no runtime type-checking. If the id is not a string (e.g. null, an object, {__proto__: ...}), the downstream SlotService.removeSlot / toggleSlot will call Array.prototype.filter/map with potentially unexpected comparison behavior. Similarly, slots:toggle destructures { id, enabled } without verifying enabled is a boolean.",
+      "location": "src/main/ipc/slots.ts:20-31",
+      "impact": "Unexpected behavior in slot mutation; potential for logic bypasses if id coercion produces false-matches against stored UUIDs.",
+      "recommendation": "Add explicit type guards before delegating to the service:\n  if (typeof id !== 'string') throw new Error('invalid id');\n  if (typeof enabled !== 'boolean') throw new Error('invalid enabled');",
+      "cwe": "CWE-20"
+    },
+    {
+      "severity": "major",
+      "category": "A03: Injection — snap:search query not length-bounded",
+      "title": "snap:search forwards unbounded renderer-supplied query string to internal HTTP service",
+      "description": "src/main/ipc/snap.ts:7-15 and src/main/snap/search.ts:29-67: The query parameter from the renderer is forwarded directly into a POST request body to http://localhost:5645/vc/v1/explorer/search without any length limit in the IPC handler. Only a minimum length of 3 chars is enforced in SnapLensSearch. A renderer-supplied query of several megabytes causes a large JSON body sent to the local snap-camera-server service, constituting a local amplification/DoS vector. Additionally, the query is embedded in JSON via JSON.stringify without escaping Unicode surrogates, which can produce invalid JSON on some runtimes.",
+      "location": "src/main/ipc/snap.ts:7 / src/main/snap/search.ts:39",
+      "impact": "Local DoS of snap-camera-server; potential JSON injection if the snap server parses the query in an unsafe way.",
+      "recommendation": "Add a maximum query length in the IPC handler:\n  if (typeof query !== 'string' || query.length > 200) throw new Error('invalid query');",
+      "cwe": "CWE-400"
+    },
+    {
+      "severity": "minor",
+      "category": "A02: Cryptographic Failures — Token Expiry Stored in Plaintext Config",
+      "title": "tokenExpiresAt and userId/broadcasterId written to plaintext config.json",
+      "description": "src/main/twitch/auth.ts:100-101 and 210-223; src/main/store/config.ts: After token exchange and refresh, tokenExpiresAt, userId, and broadcasterId are written to config.json in plaintext. The .gitignore correctly excludes config.json, but the file sits on disk readable by any process running as the same user. While the actual tokens are in keytar, the expiry timestamp leaks when the last token refresh occurred, and userId/broadcasterId are Twitch user identifiers that could be used in targeted API attacks.",
+      "location": "src/main/twitch/auth.ts:101, 218-222",
+      "impact": "Information disclosure of Twitch user identity and session timing. Low direct exploitability but contributes to a larger attack surface.",
+      "recommendation": "Move userId and broadcasterId to keytar (or at minimum document the deliberate decision to store them in plaintext). Omit tokenExpiresAt from the on-disk config and derive it from the keytar-stored token on startup via token introspection.",
+      "cwe": "CWE-312"
+    },
+    {
+      "severity": "minor",
+      "category": "A05: Security Misconfiguration — Dev Token Bypass Persisted via saveTokens",
+      "title": "Dev fast-path saves empty refreshToken to keytar credential store",
+      "description": "src/main/twitch/auth.ts:49-51: When TWITCH_HELPER_ACCESS_TOKEN env var is set, the code calls authStore.saveTokens(devToken, '') with an empty string for the refresh token. This writes an empty string into the OS credential manager under KEYTAR_ACCOUNT_REFRESH. On next normal startup, getTokens() will find both keys present (access_token=dev_value, refresh_token='') and return them. The empty refresh token will then be sent to Twitch's /token endpoint on the next refresh attempt, receiving a 400/401, clearing the tokens, and broadcasting a logout — surprising behavior for a dev workflow.",
+      "location": "src/main/twitch/auth.ts:49-51",
+      "impact": "Unexpected token invalidation after switching from dev to production mode; empty string written to OS credential store.",
+      "recommendation": "In the dev fast-path, skip saveTokens entirely and return after setting an in-memory only state, or use a flag to indicate the dev token should not be persisted:\n  // Dev fast-path — do not persist to keytar\n  return; // AuthStore.getTokens() will fall back to env var",
+      "cwe": "CWE-312"
+    },
+    {
+      "severity": "minor",
+      "category": "A09: Security Logging and Monitoring",
+      "title": "No audit logging for authentication events, slot mutations, or IPC authorization failures",
+      "description": "src/main/ipc/auth.ts, slots.ts, snap.ts: Successful login, logout, token refresh failures, slot creation/deletion, and WebSocket authentication failures (server.ts:201-207) produce no structured audit log entries. The only logging is the event log broadcast (log:entry) for media playback outcomes. Security-relevant events such as repeated auth failures, nonce mismatch on WebSocket, and path traversal blocks (media.ts:17) are silently discarded.",
+      "location": "src/main/ipc/auth.ts (all handlers), src/main/overlay/server.ts:201-215, src/main/actions/media.ts:17",
+      "impact": "No visibility into authentication anomalies or attack attempts. Forensic investigation after an incident is impossible.",
+      "recommendation": "Introduce a structured security logger (e.g. a simple append-only file logger or Winston) and emit events for: login success/failure, token refresh failure, WebSocket auth timeout/nonce mismatch, path traversal block, and IPC validation errors.",
+      "cwe": "CWE-778"
+    }
+  ]
+}

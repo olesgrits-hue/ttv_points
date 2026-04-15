@@ -48,7 +48,8 @@ export async function checkAuthOnStartup(
   const cfg = configStore.read();
   if (!authStore.isTokenExpired(cfg)) return;
 
-  const { refreshToken } = await authStore.getTokens();
+  const tokens = await authStore.getTokens();
+  const refreshToken = tokens?.refreshToken;
   if (!refreshToken) {
     _broadcastLogout();
     return;

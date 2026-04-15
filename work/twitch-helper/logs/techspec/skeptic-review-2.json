@@ -1,0 +1,42 @@
+{
+  "status": "changes_required",
+  "summary": "Checked 5 targeted claims, found 2 mirages (1 critical, 1 major)",
+  "findings": [
+    {
+      "severity": "critical",
+      "type": "missing_dependency",
+      "claim": "tech-spec Decision 2 and Dependencies section: `@nut-tree/nut-js` v4.2.0 is 'free, public npm'",
+      "reality": "`npm info @nut-tree/nut-js` returns HTTP 404 — package is NOT on the public npm registry. nutjs.dev confirms pre-built packages moved to a paid subscription model ($20–$75/month via private registry). The open-source GitHub version requires building from source with native toolchain (`@nut-tree/libnut-core`). v4.2.0 as a drop-in `npm install` does not exist on public npm.",
+      "source": "tech-spec.md, Decision 2 ('v4.2.0 (free, public npm)') and Dependencies section ('@nut-tree/nut-js v4.2.0 — prebuilt binaries, free npm')",
+      "fix": "Either: (a) Switch to the open-source build-from-source path and add `electron-rebuild` step + document native build prerequisites (node-gyp, MSVC), or (b) Evaluate replacement: `robotjs` (requires rebuild on Electron bumps, as noted), `@jitsi/robotjs` (maintained fork), or `keysender` (Windows-only, no rebuild needed). Update Decision 2 and Dependencies accordingly."
+    },
+    {
+      "severity": "major",
+      "type": "missing_pattern",
+      "claim": "tech-spec Decision 5 and Config Store description: dev fallback is `path.dirname(app.getPath('exe'))`",
+      "reality": "In Electron dev mode (running via `electron .` or `npm run dev`), `app.getPath('exe')` resolves to the Electron binary itself — e.g., `<project>/node_modules/.bin/electron` on some setups or the system Electron executable. `path.dirname()` of that is a node_modules or system bin directory, not the project root. The standard correct dev fallback is `process.cwd()` (project root when launched via npm scripts) or `app.getAppPath()` (resolves to the app's source directory). The `PORTABLE_EXECUTABLE_DIR` env var is only set by electron-builder portable builds at runtime.",
+      "source": "tech-spec.md, Decision 5 ('Dev fallback: path.dirname(app.getPath(\"exe\"))') and Architecture section ('dev fallback: path.dirname(app.getPath(\"exe\"))')",
+      "fix": "Replace dev fallback with `process.cwd()` or gate on `app.isPackaged`: if (!app.isPackaged) use `process.cwd()`, else use `process.env.PORTABLE_EXECUTABLE_DIR`. Update Decision 5 and Config Store description."
+    }
+  ],
+  "stats": {
+    "total_claims_checked": 5,
+    "confirmed": 3,
+    "mirages_found": 2,
+    "verified_claims": [
+      "keytar exists on public npm (v7.9.0)",
+      "keytar supports Windows Credential Manager (documented)",
+      "keytar has Electron prebuild targets (confirmed in package metadata)",
+      "Task 10 in Wave 4 (depends on Wave 2) — correct, no conflict",
+      "Task 11 in Wave 5 (depends on Wave 4) — correct dependency ordering, no read-after-write conflict",
+      "/media/:id register→serve→deregister flow is architecturally sound for OBS Browser Source (file registered before play command, deregistered after playback_ended confirmation, Cache-Control: no-store present)"
+    ]
+  },
+  "claim_verdicts": {
+    "1_nut_js_v4_2_0_free_public_npm": "FAIL — package not found on public npm registry (404); moved to paid private registry",
+    "2_keytar_electron_windows": "PASS with caveat — keytar works on Windows with Electron (prebuilt targets confirmed), but repo archived Dec 2022; no updates for Electron 28+. Functional risk, not a blocker for now.",
+    "3_wave_structure_task_10_wave4_task_11_wave5": "PASS — dependency ordering is correct, no read-after-write conflicts",
+    "4_media_id_obs_flow": "PASS — register→serve→deregister flow is architecturally correct for OBS Browser Source HTTP consumption",
+    "5_path_dirname_exe_dev_fallback": "FAIL — in Electron dev mode app.getPath('exe') points to Electron binary, not project root; dirname produces wrong path"
+  }
+}

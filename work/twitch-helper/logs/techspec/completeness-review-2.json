@@ -1,0 +1,106 @@
+{
+  "status": "fail",
+  "round": 2,
+  "sources": {
+    "user_spec": true,
+    "tech_spec": true,
+    "tasks": false
+  },
+  "requirements_total": 26,
+  "requirements_covered": 24,
+  "requirements_partial": 1,
+  "requirements_missing": 0,
+  "round1_fixes": {
+    "F-01": {
+      "status": "resolved",
+      "evidence": "SlotService enforces max 5 slots in Task 2 description; Queue Architecture mentions 'enforces max 5 active slots'; Config interface comment '// max 5 items enforced by SlotService'; Unit test 'max-5-slots enforcement (6th enqueue returns error)' and 'slot count ≥6 rejected'; Acceptance Criteria '6th slot rejected with error'."
+    },
+    "F-02": {
+      "status": "resolved",
+      "evidence": "Architecture 'Reconnect flow' section now fully specifies IPC path: TwitchClient emits 'disconnected' → IPC push 'twitch:status' {connected:false} → Renderer shows banner text → reconnect → IPC push 'twitch:status' {connected:true} → Renderer clears banner. Queue preservation explicitly stated: 'Queue is paused during reconnect, resumes on reconnect (items preserved in memory)'. Task 10 subscribes to 'twitch:status' IPC."
+    },
+    "F-03": {
+      "status": "resolved",
+      "evidence": "User-Spec Deviations now contains 'OBS integration via Browser Source URL (Decision 3)' with reason and '[APPROVED BY USER]' marker."
+    },
+    "F-04": {
+      "status": "resolved",
+      "evidence": "User-Spec Deviations now contains 'Global remove-mask hotkey (Decision 8)' with reason and '[APPROVED BY USER]' marker."
+    },
+    "F-05": {
+      "status": "resolved",
+      "evidence": "OverlayServer now explicitly serves media files at '/media/:id' via in-memory registry (uuid-keyed). MediaAction registers file and pushes served HTTP URL (not raw file path). MediaRegistryEntry data model added. Integration test 'register file → GET /media/:id → 200'. Acceptance Criteria includes 200/404 assertions for /media/:id. Decision 3 explicitly states 'Media files served at /media/:id'."
+    },
+    "F-09": {
+      "status": "partial",
+      "evidence": "Task 5 and Task 11 still do not describe error handling for reward creation failures (name conflict with existing Twitch reward, API rate limits, invalid cooldown values, orphan reward on partial success where Twitch reward is created but config.json save fails). The Architecture flow diagram covers redemption processing errors but not reward creation errors. Reward creation is an external API call on an L-size feature — error strategy remains unspecified."
+    },
+    "F-10": {
+      "status": "resolved",
+      "evidence": "Config interface no longer contains overlayPort. Port 7891 is now a hardcoded constant in Architecture descriptions and Acceptance Criteria, as required."
+    }
+  },
+  "findings": [
+    {
+      "id": "F-09",
+      "type": "underengineering",
+      "source": "tech-spec",
+      "requirement": "US-8: Create new Twitch reward from app (name, cost, cooldown)",
+      "detail": "Task 5 (Twitch API Client) and Task 11 (Slot Management UI) still do not specify error handling for reward creation failures: (1) Twitch returns 400 if a reward with the same name already exists for this channel; (2) partial success scenario — Twitch reward is created successfully but the subsequent config.json write fails, leaving an orphan reward on Twitch with no corresponding slot config; (3) invalid cooldown values rejected by Twitch API. The on-error flow in the Architecture diagram covers redemption queue errors only, not reward creation errors triggered from the UI. For an L-size feature making external API calls, absence of reward creation error strategy remains a gap.",
+      "severity": "major"
+    },
+    {
+      "id": "F-NEW-01",
+      "type": "undocumented_deviation",
+      "source": "tech-spec",
+      "requirement": "Decision 4: keytar replaces auth.json — user-facing artifact changed, not in User-Spec Deviations",
+      "detail": "The user-spec explicitly states 'Токен сохраняется в auth.json рядом с .exe' and acceptance criteria include 'config.json и auth.json сохраняются между перезапусками exe'. Tech-spec Decision 4 replaces auth.json entirely with keytar (Windows Credential Manager) and metadata in config.json. This changes a user-visible artifact described in user-spec acceptance criteria. Decision 4 body says 'User approved this in tech-spec clarification' but no corresponding entry exists in the User-Spec Deviations section. Per methodology, [TECHNICAL] decisions that change user-visible behavior must have a documented deviation entry with reason and approval status. This was not flagged in round 1 and remains unresolved.",
+      "severity": "critical"
+    },
+    {
+      "id": "F-08",
+      "type": "partial",
+      "source": "user-spec",
+      "requirement": "US-26: Windows 10+ 64-bit, no admin rights required",
+      "detail": "nut-js v4 uses SendInput/keyboard hooks which may require elevated permissions on Windows 10+ when target application runs at higher integrity level (e.g. Snap Camera running as administrator). The Risks table does not mention this. Decision 2 discusses nut-js version selection but does not verify or assert no-admin operation. This remains unaddressed from round 1.",
+      "severity": "minor"
+    },
+    {
+      "id": "F-12",
+      "type": "underengineering",
+      "source": "tech-spec",
+      "requirement": "US-21: config.json and auth.json persist across restarts",
+      "detail": "ConfigStore write semantics are not specified as atomic (write-to-temp + rename). Node.js fs.writeFile is non-atomic — a crash mid-write corrupts the file. Unit tests cover recovery from corrupt JSON but the spec does not require prevention. Remains unaddressed from round 1.",
+      "severity": "minor"
+    }
+  ],
+  "traceability_matrix": {
+    "US-1":  { "description": "OAuth login via Twitch (PKCE, scopes)", "status": "covered" },
+    "US-2":  { "description": "Token saved (keytar+config.json); auto-login on next launch", "status": "covered" },
+    "US-3":  { "description": "Auto-show login screen when token expired or revoked (startup + mid-session)", "status": "covered", "note": "Mid-session 401 flow now explicitly described in Architecture 'Token expiry / 401 at runtime' section and Task 5." },
+    "US-4":  { "description": "Main screen: Snap Camera + Media sections, event log", "status": "covered" },
+    "US-5":  { "description": "Event log: time/viewer/reward/green-red icon; red tooltip", "status": "covered", "note": "MaskAction IPC log emission now explicit in Task 8 and Architecture flow." },
+    "US-6":  { "description": "OBS URL displayed at top of screen", "status": "covered" },
+    "US-7":  { "description": "Add slot: type picker Mask/Media/Meme", "status": "covered" },
+    "US-8":  { "description": "Reward: create new (name, cost, cooldown) or choose existing manageable", "status": "partial", "finding": "F-09" },
+    "US-9":  { "description": "Mask slot: lens from snap-camera-server + hotkey + UI hint", "status": "covered" },
+    "US-10": { "description": "Media slot: file path via file picker dialog", "status": "covered" },
+    "US-11": { "description": "Meme slot: folder path via folder picker dialog", "status": "covered" },
+    "US-12": { "description": "Slot toggle enable/disable without losing config", "status": "covered" },
+    "US-13": { "description": "FIFO queue for simultaneous redemptions", "status": "covered" },
+    "US-14": { "description": "Media/Meme: push file to overlay via WebSocket, random position/angle, fixed size", "status": "covered", "note": "HTTP media serving via /media/:id now fully specified." },
+    "US-15": { "description": "Overlay signals playback_ended; fulfill after signal or 120s timeout", "status": "covered" },
+    "US-16": { "description": "Media/Meme error (file not found, empty folder): cancel + red log", "status": "covered" },
+    "US-17": { "description": "Mask flow: simulate hotkey, wait 30s, simulate remove-mask hotkey", "status": "covered" },
+    "US-18": { "description": "Mask flow: fulfill after 30s, green log", "status": "covered" },
+    "US-19": { "description": "Reconnect on Twitch loss: notification, auto-reconnect, preserve queue/settings", "status": "covered", "note": "IPC path and queue preservation invariant now fully specified in Architecture." },
+    "US-20": { "description": "Overlay transparent when no active playback", "status": "covered" },
+    "US-21": { "description": "config.json and auth.json persist across restarts", "status": "covered" },
+    "US-22": { "description": "snap-camera-server unavailable: show error with instructions", "status": "covered" },
+    "US-23": { "description": "Portability: any folder, no install, data files next to .exe", "status": "covered" },
+    "US-24": { "description": "Max 5 slots (Snap Camera + Media sections)", "status": "covered", "note": "SlotService enforcement, unit tests, and Acceptance Criteria now all present." },
+    "US-25": { "description": "No auto-update in MVP", "status": "covered" },
+    "US-26": { "description": "Windows 10+ 64-bit, no admin rights", "status": "partial", "finding": "F-08" }
+  },
+  "summary": "Round 1 fixes: 6/7 items resolved. F-09 (reward creation error handling) remains partial (major). New critical finding F-NEW-01: Decision 4 (keytar replacing auth.json) changes a user-spec acceptance criterion but is absent from User-Spec Deviations — the deviation body claims 'User approved this in tech-spec clarification' but no Deviations entry exists. Two minor findings (F-08 nut-js admin rights, F-12 non-atomic config writes) remain from round 1. Status: FAIL — 1 critical finding (F-NEW-01 undocumented deviation for Decision 4 / auth.json replacement)."
+}

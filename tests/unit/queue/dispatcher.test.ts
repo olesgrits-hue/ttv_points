@@ -50,7 +50,7 @@ describe('Dispatcher', () => {
     expect(api.cancelRedemption).toHaveBeenCalledWith('reward-x', 'r1');
   });
 
-  test('disabled_slot_triggers_cancel', async () => {
+  test('disabled_slot_triggers_cancel_and_no_action_handler', async () => {
     const slot = {
       id: 'slot-1',
       type: 'mask',
@@ -58,12 +58,20 @@ describe('Dispatcher', () => {
       rewardId: 'reward-x',
       rewardTitle: 'My Reward',
     };
+    const maskHandler = jest.fn().mockResolvedValue(undefined);
+    const mediaHandler = jest.fn().mockResolvedValue(undefined);
+    registerActionHandlers(maskHandler, mediaHandler);
+
     const api = makeApi();
     const dispatcher = new Dispatcher(makeConfigStore([slot]), api);
 
     await dispatcher.dispatch(mockRedemption);
 
+    // Must cancel the redemption.
     expect(api.cancelRedemption).toHaveBeenCalledWith('reward-x', 'r1');
+    // Must NOT invoke any action handler — slot is disabled.
+    expect(maskHandler).not.toHaveBeenCalled();
+    expect(mediaHandler).not.toHaveBeenCalled();
   });
 
   test('enabled_slot_routes_to_handler', async () => {

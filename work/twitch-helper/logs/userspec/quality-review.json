@@ -1,0 +1,81 @@
+{
+  "status": "approved",
+  "checks": {
+    "completeness": "pass",
+    "edge_cases": "pass",
+    "acceptance_criteria": "pass",
+    "contradictions": "pass",
+    "template_compliance": "pass",
+    "size_check": "warning"
+  },
+  "findings": [
+    {
+      "check": "size_check",
+      "severity": "minor",
+      "issue": "Size declared as L (new architecture), but the spec has no explicit breakdown of sub-components or modules. For size L, the architecture surface (Electron main process, overlay HTTP/WS server, Twitch EventSub client, Snap Camera hotkey driver) would benefit from at least a high-level component list to anchor task decomposition.",
+      "location": "Front-matter: size: L",
+      "fix": "Add a brief component inventory in 'Технические решения' or a dedicated 'Архитектура' sub-section listing the major parts: Electron shell, overlay server, Twitch client, queue engine, config layer."
+    },
+    {
+      "check": "edge_cases",
+      "severity": "minor",
+      "issue": "Token expiry / token refresh not addressed. Twitch OAuth tokens expire; if the token in auth.json becomes invalid the spec does not describe what the user sees or what the app does.",
+      "location": "Section 'Как должно работать' → 'Первый запуск'; Section 'Ограничения'",
+      "fix": "Add a sentence: what happens when auth.json contains an expired or revoked token — e.g., show a re-login prompt, do not silently fail."
+    },
+    {
+      "check": "edge_cases",
+      "severity": "minor",
+      "issue": "Behavior when snap-camera-server is unreachable at the moment a Mask slot fires (not just at startup) is not specified. The risk section only covers startup-time unavailability.",
+      "location": "Section 'Риски' → 'snap-camera-server не запущен при старте'",
+      "fix": "Extend the risk mitigation to cover runtime failure: if SendInput fires but snap-camera-server is unavailable mid-queue, describe the outcome (fulfill anyway, or cancel+red log)."
+    },
+    {
+      "check": "acceptance_criteria",
+      "severity": "minor",
+      "issue": "AC for 'no-mask hotkey' (step 6 of the Mask flow) is missing from the acceptance criteria checklist. The flow mentions 'симулирует нажатие снять маску (hotkey без маски)' but the corresponding AC only checks that the mask is applied and removed after 30 sec — it does not verify the no-mask hotkey setup in the UI.",
+      "location": "Section 'Критерии приёмки' — Mask slot checklist item",
+      "fix": "Add AC: 'В настройке слота-маски есть поле для hotkey снятия маски (no-mask hotkey), и оно используется для снятия маски через 30 сек.'"
+    },
+    {
+      "check": "completeness",
+      "severity": "minor",
+      "issue": "The spec does not define what 'фиксированный размер' for the OBS overlay means concretely (pixels, percentage of viewport, configurable). Testability of the related AC is low without a concrete value.",
+      "location": "Section 'Критерии приёмки' — Media/Meme slot items; Section 'Во время стрима' → 'Медиафайл / Рандомный мем'",
+      "fix": "Specify the fixed size (e.g., 320×240 px, or 25% of overlay viewport) so it can be verified deterministically in agent tests."
+    }
+  ],
+  "interview_coverage": {
+    "covered": [
+      "Флоу первого запуска и OAuth логин",
+      "5 слотов MVP, 3 типа (маска / медиафайл / рандомный мем)",
+      "UI: секции Snap Camera и Media, лог событий с цветными статусами и тултипами",
+      "OBS Browser Source overlay с случайной позицией и углом",
+      "FIFO очередь для одновременных redemptions",
+      "Ручная привязка hotkey в приложении для маски",
+      "Список линз из snap-camera-server API (вариант A)",
+      "Auto-fulfill (успех) и auto-cancel (ошибка) через Twitch API",
+      "Лог: время / ник / награда / 🟢🔴 с тултипом ошибки",
+      "Обработка ошибок: файл не найден, папка пустая → cancel + красный лог",
+      "Snap Camera hotkey via Windows SendInput",
+      "Маска висит 30 сек затем снимается, следующая маска ждёт очереди",
+      "Потеря соединения Twitch: уведомление + авто-реконнект",
+      "Toggle вкл/выкл слота без удаления настроек",
+      "Слоты без редактирования — удалить и создать заново",
+      "Cooldown через настройки награды Twitch при создании",
+      "Токен сохраняется в auth.json, автозапуск не нужен",
+      "Electron (TypeScript) стек",
+      "Портативный exe, Windows 10+, без admin прав",
+      "config.json и auth.json рядом с .exe",
+      "Стратегия тестирования: unit + integration, без E2E",
+      "Риски: Snap Camera не запущена, Twitch API изменения, размер exe"
+    ],
+    "missing": [
+      "Поведение при истёкшем / отозванном токене в auth.json (не отражено в user-spec)",
+      "Runtime-ошибка snap-camera-server во время стрима (покрыт только startup-сценарий)",
+      "Поле hotkey снятия маски (no-mask hotkey) в настройке слота — флоу описан, но нет AC",
+      "Конкретный фиксированный размер медиа в overlay — остался как 'фиксированный размер' без значения"
+    ]
+  },
+  "summary": "Спецификация полная, внутренне согласованная, покрывает все ключевые сценарии и соответствует шаблону. Найдены 4 minor-замечания (нет critical/major) — преимущественно пробелы в edge cases и одна не до конца тестируемая AC. Статус: approved, доработки по замечаниям — опционально."
+}

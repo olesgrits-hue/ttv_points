@@ -1,0 +1,77 @@
+{
+  "status": "needs_improvement",
+  "summary": "Unit and integration test plan has solid coverage of the happy path but has multiple gaps in behavioral assertions and missing anchors for critical paths: token expiry/refresh, disabled-slot handling, keepalive watchdog, and hotkey string parsing. Two anchors are mock-only (MaskAction hotkey dispatch, TwitchClient reconnect). E2E absence is justified for a personal tool but leaves nut-js simulation entirely outside automated coverage. Overall the strategy is structurally sound for an L-size Electron app but needs 5-6 targeted additions before it adequately protects the critical paths.",
+  "findings": [
+    {
+      "severity": "major",
+      "category": "mock_only",
+      "location": "Section: Testing Strategy > Unit tests > MaskAction",
+      "issue": "'hotkey dispatch called' is a mock-only anchor. It asserts nut-js was invoked but does not verify the sequence: mask hotkey fires first, 30s elapses, then remove-mask hotkey fires, and finally fulfill is called. Litmus test: delete the timer logic entirely — the anchor still passes because nut-js was still called once.",
+      "recommendation": "Replace with a behavioral sequence test using fake timers. Assert: (1) keyboard.type called with parsed mask hotkey keys, (2) after advanceTimersByTime(30000) keyboard.type called with removeMask hotkey keys, (3) twitchClient.fulfillRedemption called exactly once after step 2. Mock only nut-js keyboard and twitchClient. Use jest.useFakeTimers() to control the 30s wait."
+    },
+    {
+      "severity": "major",
+      "category": "mock_only",
+      "location": "Section: Testing Strategy > Unit tests > TwitchClient (unit with mocks)",
+      "issue": "'reconnect triggered on close' asserts that some reconnect function was called — this is mock-only. It does not verify that after reconnect the EventSub subscription is re-established. Litmus test: stub the reconnect call to do nothing — anchor still passes.",
+      "recommendation": "Test behavioral outcome: simulate WebSocket 'close' event → assert that within the reconnect window a new WebSocket connection is initiated AND a new subscription POST is sent (assert on the mock HTTP client calls with correct session_id from the new session_welcome). The test should verify the client is operational after reconnect, not merely that a function was invoked."
+    },
+    {
+      "severity": "major",
+      "category": "missing_coverage",
+      "location": "Section: Testing Strategy > Unit tests",
+      "issue": "No anchor for disabled-slot handling. User-spec acceptance criterion: 'Toggle вкл/выкл слота работает без удаления настроек.' When a redemption arrives for a slot with enabled=false, the queue dispatcher must skip it (or cancel immediately). This branch has no test.",
+      "recommendation": "Add unit test for Queue/Dispatcher: enqueue a redemption whose rewardId maps to a slot with enabled=false. Assert: (1) no action handler is invoked, (2) twitchClient.cancelRedemption is called with the redemption id, (3) a log entry with status='error' and errorMessage='Slot disabled' is emitted via IPC."
+    },
+    {
+      "severity": "major",
+      "category": "missing_coverage",
+      "location": "Section: Testing Strategy > Unit tests > TwitchClient",
+      "issue": "No anchor for token expiry/refresh or invalid-token handling. User-spec acceptance criterion: 'Если токен истёк или отозван — приложение автоматически показывает экран логина.' The TwitchClient unit tests cover EventSub parsing and reconnect but not the 401 Unauthorized response path from the REST API, which must trigger IPC navigation to the login screen.",
+      "recommendation": "Add unit test: mock Twitch REST client to return HTTP 401. Assert: (1) AuthStore clears the token (or marks as invalid), (2) IPC message 'auth:logout' (or equivalent) is sent to renderer, (3) no retry loop is entered. Also add a unit test for startup token validation: if AuthStore.read() returns a token with expiresAt in the past, assert IPC navigates to auth screen without attempting an API call."
+    },
+    {
+      "severity": "major",
+      "category": "missing_coverage",
+      "location": "Section: Testing Strategy > Unit tests > TwitchClient",
+      "issue": "No anchor for the 60-second keepalive watchdog. Tech-spec Decision 5 states: 'if no message for 60s → force reconnect.' This is an explicit implementation decision with observable behavior but no corresponding test anchor.",
+      "recommendation": "Add unit test with fake timers: create TwitchClient with mocked WebSocket, do NOT emit any messages. Advance timers by 60000ms. Assert: the existing WebSocket was closed and a new connection was initiated (mock WebSocket constructor called twice, or close() called on the first instance)."
+    },
+    {
+      "severity": "minor",
+      "category": "missing_coverage",
+      "location": "Section: Testing Strategy > Unit tests > MaskAction",
+      "issue": "No anchor for malformed or unsupported hotkey string parsing. Tech-spec Task 8 explicitly states: 'Parse hotkey strings (e.g. ctrl+shift+1) into nut-js Key sequences.' Edge cases — empty string, unknown key name, single modifier with no key — are not tested.",
+      "recommendation": "Add unit tests for the hotkey parser function: (1) 'ctrl+shift+1' → [Key.LeftControl, Key.LeftShift, Key.Num1], (2) '' (empty string) → throws HotkeyParseError, (3) 'ctrl+unknownkey' → throws HotkeyParseError with descriptive message. These are pure function tests requiring no mocks."
+    },
+    {
+      "severity": "minor",
+      "category": "missing_coverage",
+      "location": "Section: Testing Strategy > Unit tests > TwitchClient",
+      "issue": "'reward create/fulfill/cancel payloads correct' is ambiguous — if implemented as toHaveBeenCalledWith assertions on the HTTP mock, it tests mock wiring not response handling. It is unclear whether the test also asserts that the returned reward ID is stored or that API errors are propagated.",
+      "recommendation": "Clarify anchor to explicitly cover: (1) createReward called with correct body shape AND returns the created reward's id from the mock response, (2) fulfillRedemption called with correct rewardId+redemptionId AND returns void on 200, (3) fulfillRedemption rejects with TwitchApiError on non-200 status. This ensures the response path is tested, not just the request path."
+    },
+    {
+      "severity": "minor",
+      "category": "pyramid_violation",
+      "location": "Section: Testing Strategy > E2E tests",
+      "issue": "E2E absence is user-approved and the justification (real stream + OBS required) is valid. However, the nut-js keyboard simulation path — the most platform-specific and failure-prone part of the app — has zero automated test coverage at any level. Unit tests mock nut-js entirely, so a binary incompatibility or incorrect Key constant would only surface at manual test time.",
+      "recommendation": "Add a smoke test (not full E2E) as part of Task 1 infrastructure: verify that nut-js can be imported and Key constants are accessible in the target Electron Node.js version. This does not require a running app or OBS — it runs in the main process context during CI and catches binary/version mismatches early. Tech-spec already references this in the Risks table ('smoke test' for nut-js binary)."
+    }
+  ],
+  "metrics": {
+    "filesReviewed": 2,
+    "litmusTest": {
+      "checked": 14,
+      "passed": 10,
+      "failed": 2
+    },
+    "coverageAssessment": "adequate",
+    "pyramidBalance": {
+      "unit": 14,
+      "integration": 5,
+      "e2e": 0,
+      "assessment": "unbalanced"
+    }
+  }
+}

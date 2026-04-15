@@ -1,0 +1,60 @@
+{
+  "status": "changes_required",
+  "findings": [
+    {
+      "severity": "critical",
+      "category": "tasks",
+      "issue": "Task 11 (Wave 4) reads 'src/renderer/screens/MainScreen.tsx' which is created by Task 10 in the same wave. Parallel tasks cannot have read-after-write dependencies.",
+      "fix": "Move Task 11 (Slot Management UI) to a new Wave 5, after Wave 4. Add 'Files to read: src/renderer/screens/MainScreen.tsx' dependency explicitly and note it depends on Task 10."
+    },
+    {
+      "severity": "major",
+      "category": "task_quality",
+      "issue": "Task 5 description embeds concrete implementation details that duplicate Decision 5 and Decision 6: endpoint URL 'POST /helix/channel_points/custom_rewards?only_manageable_rewards=true', filter param 'only_manageable_rewards=true', WebSocket URL 'wss://eventsub.wss.twitch.tv/ws', specific message type 'session_welcome', '60s keepalive'. These are decision-level specifics, not scope description.",
+      "fix": "Replace duplicated values with references to the Decisions section. Task description should say 'implement Channel Points client per Decision 6' and 'implement EventSub WebSocket per architecture diagram' rather than restating decision content."
+    },
+    {
+      "severity": "major",
+      "category": "task_quality",
+      "issue": "Task 6 description duplicates Decision 5 content: endpoint 'POST http://localhost:5645/vc/v1/explorer/search' and '3+ chars' minimum are already documented in Decision 5.",
+      "fix": "Reference Decision 5 from the task description instead of restating it. E.g., 'HTTP client for snap-camera-server lens search (see Decision 5). Handle server unavailable with error message.'"
+    },
+    {
+      "severity": "major",
+      "category": "task_quality",
+      "issue": "Task 3 description duplicates Decision 3 content: port 7891 and the rationale-adjacent detail about OBS Browser Source URL appear in both Decision 3 and the task description.",
+      "fix": "Task description should reference Decision 3 for port choice. Keep only scope-level description: 'Express HTTP + WebSocket server serving the overlay page and handling bidirectional messaging with the overlay client.'"
+    },
+    {
+      "severity": "major",
+      "category": "verification",
+      "issue": "Task 8 (Mask Action Handler) uses nut-js for OS-level keyboard simulation — an external library with native binaries — but has no 'Verify-smoke' field. Native binary failures are silent at runtime.",
+      "fix": "Add 'Verify-smoke: node -e \"const {keyboard, Key} = require(\\\"@nut-tree/nut-js\\\"); keyboard.type(Key.LeftControl).then(() => console.log(\\\"nut-js OK\\\")).catch(e => { console.error(e); process.exit(1); })\"' or equivalent smoke that confirms the prebuilt binary loads without error."
+    },
+    {
+      "severity": "major",
+      "category": "verification",
+      "issue": "Task 4 (Twitch OAuth) involves external service integration (Twitch auth URL, token exchange, browser open) but has no 'Verify-smoke' field.",
+      "fix": "Add a Verify-smoke for the parts that can be tested without a browser: e.g., verify the local callback HTTP server starts on port 0, verify PKCE challenge/verifier generation produces valid output. Mark browser-dependent steps under 'Verify-user'."
+    },
+    {
+      "severity": "minor",
+      "category": "standards",
+      "issue": "Project Knowledge files 'architecture.md' and 'patterns.md' contain only unfilled template placeholders — no actual project-specific content. Standards compliance check (section 3) was skipped.",
+      "fix": "Fill architecture.md with the actual tech stack and project structure (Electron 33+, src/main, src/renderer, src/overlay layout). Fill patterns.md with project conventions. This enables future validators to check file path consistency."
+    },
+    {
+      "severity": "minor",
+      "category": "tasks",
+      "issue": "Task 2 (Config & Auth Store) has no 'Files to read' field despite being a foundational module that other tasks depend on. Absence of context files may cause the executing agent to miss existing related types.",
+      "fix": "Add 'Files to read: src/main/store/types.ts' (once created) or note N/A for Wave 1 bootstrap tasks. Not blocking, but makes the task more self-contained."
+    },
+    {
+      "severity": "minor",
+      "category": "tasks",
+      "issue": "Task 10 (Main UI) has no 'Files to read' field despite rendering components that depend on IPC contracts defined in main process.",
+      "fix": "Add 'Files to read: src/main/ipc/auth.ts' (Task 4 output) to give the renderer agent the IPC channel names. Adjust after Task 4 is created."
+    }
+  ],
+  "summary": "1 critical finding: Task 11 depends on a file produced by Task 10 in the same parallel wave — move Task 11 to a dedicated Wave 5. 3 major findings: decision content duplicated verbatim in task descriptions for Tasks 3, 5, 6 (move to Decisions references); 2 major findings: Tasks 4 and 8 lack Verify-smoke for external integrations. 3 minor findings: unfilled Project Knowledge, missing Files-to-read in Tasks 2 and 10. No missing sections, frontmatter valid, all skills and reviewers in catalog, no AC/TDD anchors in tasks, no time estimates."
+}

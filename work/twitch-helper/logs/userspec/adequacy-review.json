@@ -1,0 +1,70 @@
+{
+  "status": "approved",
+  "findings": [
+    {
+      "category": "feasibility",
+      "severity": "major",
+      "issue": "Twitch requires an HTTPS redirect URI for OAuth, but the spec implies opening a browser and storing a token locally without specifying the OAuth flow (Authorization Code + PKCE vs Device Code Flow vs localhost loopback).",
+      "why_matters": "Twitch supports http://localhost redirect URIs for public clients, which works for a portable desktop app, but the client_id must be registered in the Twitch Developer Console. Without clarifying the flow and how the client_id is bundled/managed, the 'login via Twitch' acceptance criterion cannot be implemented reliably. Also, EventSub WebSocket requires a user access token with channel:read:redemptions and channel:manage:redemptions scopes.",
+      "fix": "Add to spec: OAuth flow = Authorization Code + PKCE via loopback http://localhost:<random-port>/callback; list required scopes (channel:read:redemptions, channel:manage:redemptions); note that client_id is bundled into the binary (public client, no secret)."
+    },
+    {
+      "category": "feasibility",
+      "severity": "major",
+      "issue": "Spec says 'fulfill after video finishes playing' — but OBS Browser Source plays the video in OBS, not in the app. The app only knows the file was pushed via WebSocket; it needs the overlay page to report back 'finished'.",
+      "why_matters": "Without an ack from the overlay (WebSocket message 'ended'), the app cannot know when to call fulfill, and the FIFO queue cannot advance. This is a core mechanic, currently implicit.",
+      "fix": "Explicitly state that the overlay page sends a 'playback_ended' WebSocket message back to the server, which triggers fulfill and dequeues the next item. Also define timeout fallback (e.g. if overlay disconnected, fulfill after N seconds or cancel)."
+    },
+    {
+      "category": "feasibility",
+      "severity": "minor",
+      "issue": "snap-camera-server is referenced as a source of 'list of lenses' but the spec doesn't confirm that this API exists or its shape.",
+      "why_matters": "If snap-camera-server only serves lens binaries (as the spec itself notes under 'Windows SendInput' rationale), listing lenses for UI selection may not be supported. The acceptance criterion 'список линз подгружается из snap-camera-server API' may be unimplementable.",
+      "fix": "During tech-spec phase, verify snap-camera-server endpoints; if no list endpoint exists, change UX to 'user enters lens name + hotkey manually' or scan a local lens folder."
+    },
+    {
+      "category": "feasibility",
+      "severity": "minor",
+      "issue": "Twitch API 'cancel redemption' (UPDATE status to CANCELED) is only available to the broadcaster for rewards created by the same client_id. Rewards created manually in Twitch dashboard by the streamer cannot be fulfilled/cancelled via API.",
+      "why_matters": "The spec allows 'choose existing reward from Twitch API' — but if that reward was created outside this app, fulfill/cancel will fail with 403. This breaks a listed acceptance criterion.",
+      "fix": "Clarify: existing-reward selection is filtered to rewards where is_owned_by_current_client=true, OR warn user in UI that externally-created rewards cannot be auto-fulfilled/cancelled."
+    },
+    {
+      "category": "underengineering",
+      "severity": "minor",
+      "issue": "No specification of how config.json stores media paths when exe moves folders (portability promise).",
+      "why_matters": "Spec promises 'portable — works from any folder' but media file paths are absolute user selections. If the user moves the whole folder including media, absolute paths break. Minor but worth deciding: absolute-only (document), or relative-to-exe when possible.",
+      "fix": "Add one-line decision: 'media paths stored as absolute; user is responsible for not moving media files'. Or support relative paths when media is under exe folder."
+    },
+    {
+      "category": "overengineering",
+      "severity": "minor",
+      "issue": "Random position + random rotation angle is a small nice-to-have but adds UI/config surface if user wants to tune bounds.",
+      "why_matters": "Not a blocker — spec says 'fixed size, random position and angle' with no configurability, which is fine for MVP. Flagging only to confirm no hidden configurability creep.",
+      "fix": "No change needed — current scope is appropriately minimal. Confirm at tech-spec that bounds are hardcoded constants, not settings."
+    },
+    {
+      "category": "sizing",
+      "severity": "minor",
+      "issue": "Size L is correct, but 'MVP: maximum 5 slots' is an odd artificial limit given the effort to support N is identical.",
+      "why_matters": "Hard-coding a 5-slot cap adds validation code without reducing implementation cost. If it's a UX decision (keep the screen simple), fine; if it's a scope-reduction measure, it doesn't reduce scope.",
+      "fix": "Either remove the 5-slot cap (support N slots), or note explicitly that 5 is a UX decision for screen layout, not a technical limit."
+    },
+    {
+      "category": "better_alternative",
+      "severity": "minor",
+      "issue": "For the overlay, consider OBS WebSocket (obs-websocket v5, built into OBS 28+) instead of Browser Source + custom HTTP server.",
+      "why_matters": "obs-websocket lets you trigger media sources / scenes directly, avoiding the need to ship an HTTP+WebSocket server and ask users to configure Browser Source URLs. It's one less moving piece and removes the 'overlay must be open in OBS' dependency. However, it requires users to install obs-websocket (or use OBS 28+) and configure auth.",
+      "fix": "Either accept current choice (Browser Source is simpler for users, no OBS config) and document why, OR evaluate obs-websocket during tech-spec. Current choice is defensible; just record the trade-off."
+    },
+    {
+      "category": "better_alternative",
+      "severity": "minor",
+      "issue": "For hotkey simulation, nut.js / robotjs are common Node libraries; SendInput via native binding (ffi-napi / node-gyp) is more work than needed.",
+      "why_matters": "Electron + TypeScript has well-maintained libraries (nut-js, @nut-tree/nut-js) that wrap SendInput. Spec says 'Windows SendInput API' which is correct conceptually but may bias toward hand-rolling FFI.",
+      "fix": "In tech-spec, prefer nut-js or robotjs over raw SendInput FFI. Spec text is fine at user level; flag for tech-spec."
+    }
+  ],
+  "worst_category": "feasibility",
+  "summary": "Spec is well-scoped and feasible overall. Two major feasibility gaps to clarify before tech-spec: the OAuth flow details (loopback + PKCE + scopes) and the overlay->app playback-ended ack that gates fulfill and FIFO advancement. Everything else is minor; status approved with notes."
+}

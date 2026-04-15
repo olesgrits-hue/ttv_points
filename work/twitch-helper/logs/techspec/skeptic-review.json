@@ -1,0 +1,45 @@
+{
+  "status": "changes_required",
+  "summary": "Checked 8 claims, found 2 critical and 1 minor mirage",
+  "findings": [
+    {
+      "severity": "critical",
+      "type": "missing_dependency",
+      "claim": "tech-spec says: '@nut-tree/nut-js' v5.1.1 is available as a standard npm package with prebuilt binaries — no special setup needed",
+      "reality": "As of April 2026, @nut-tree/nut-js v5.x is hosted on a PRIVATE registry (pkg.nutjs.dev) behind a paid subscription (LemonSqueezy). The public npm registry only has v4.x. Installing requires a paid subscription, an account at nutjs.dev, and configuring .npmrc with an auth token. The tech-spec presents it as a drop-in npm install with no caveats. The code-research.md acknowledges v5.1.1 and Node 22+ requirement but does NOT mention the paid/private registry requirement. This is a build-blocker: CI/CD will fail with 404 unless the token is configured.",
+      "source": "tech-spec.md, Decision 2 and Dependencies section; code-research.md section 2",
+      "fix": "Add a risk entry and infrastructure task: (1) purchase nutjs.dev subscription, (2) add npm token to CI secrets and .npmrc, (3) document this requirement in Task 1 (Project Infrastructure). Alternatively, evaluate open-source alternatives: robotjs with @electron/rebuild, or uiohook-napi (MIT, public npm) for keyboard simulation."
+    },
+    {
+      "severity": "critical",
+      "type": "missing_function",
+      "claim": "tech-spec says: nut-js keyboard API is 'await keyboard.type(Key.LeftControl, Key.D1)' — implying Key.D1 exists in the Key enum",
+      "reality": "The nut.js GitHub repository (latest tag v4.2.0 on master; develop branch at v4.2.0) has no Key.D1 in any searchable source. A GitHub code search for 'D1 Key enum' in the nut-tree/nut.js repo returned zero results. The official docs keyboard reference lists F1-F12, modifier keys, navigation keys — but numeric digit keys are NOT listed as D0-D9. The code-research.md section 2 explicitly lists 'D0–D9 (digit keys)' as Key enum values, but this is unverified and the public v4 repo does not show it. If D1-D9 do not exist in the version available to the project, all mask hotkey simulation will fail at runtime with 'Key.D1 is not a valid Key' or undefined behavior.",
+      "source": "tech-spec.md, Decision 2; code-research.md section 2 (Keyboard API block)",
+      "fix": "Before finalizing Task 8 (Mask Action Handler), verify Key enum values by: (1) installing the actual nut-js version being used and inspecting node_modules/@nut-tree/nut-js/dist/key.enum.d.ts, (2) if D1–D9 do not exist, find the correct enum names for digit keys (possibly Key.One, Key.Num1, or similar). Update tech-spec and code-research with verified enum names."
+    },
+    {
+      "severity": "minor",
+      "type": "missing_pattern",
+      "claim": "tech-spec Decision 4 says: 'process.env.PORTABLE_EXECUTABLE_DIR (set by electron-builder portable)' — implied as the primary and only env var needed",
+      "reality": "Confirmed: electron-builder portable does set PORTABLE_EXECUTABLE_DIR. However, code-research.md (section 4) clarifies there are THREE env vars set: PORTABLE_EXECUTABLE_FILE, PORTABLE_EXECUTABLE_DIR, and PORTABLE_EXECUTABLE_APP_FILENAME. The tech-spec only mentions PORTABLE_EXECUTABLE_DIR, which is correct for the use case (getting the directory). No mirage here, but the tech-spec's dev-mode fallback 'process.cwd()' in the Risks section is slightly inconsistent with code-research which recommends 'path.dirname(app.getPath(\"exe\"))' as the dev fallback. Not a blocker.",
+      "source": "tech-spec.md, Decision 4 and Risks section; code-research.md section 4",
+      "fix": "Align dev-mode fallback in tech-spec with code-research recommendation: use path.dirname(app.getPath('exe')) instead of process.cwd(). Minor consistency fix."
+    }
+  ],
+  "stats": {
+    "total_claims_checked": 8,
+    "confirmed": 6,
+    "mirages_found": 3,
+    "verified_claims": [
+      "wss://eventsub.wss.twitch.tv/ws — confirmed via Twitch official docs",
+      "channel.channel_points_custom_reward_redemption.add — confirmed via Twitch EventSub subscription types docs",
+      "GET /helix/channel_points/custom_rewards?only_manageable_rewards=true — confirmed: parameter exists per Twitch API reference",
+      "snap-camera-server port 5645 (APP_LOCAL_PORT default) — confirmed via code-research.md which cites example.env",
+      "POST /vc/v1/explorer/search (min 3 chars) — confirmed via code-research.md with source reference to src/endpoints/explorer/",
+      "pkce-challenge npm package — confirmed: exists on public npm, latest v6.0.0 (MIT)",
+      "server.listen(0) for OS-assigned port — confirmed via Node.js official docs: port 0 causes OS to assign arbitrary unused port, retrieve via server.address().port",
+      "process.env.PORTABLE_EXECUTABLE_DIR set by electron-builder portable — confirmed via code-research.md section 4"
+    ]
+  }
+}

@@ -1,0 +1,399 @@
+# Interview Plan for Feature Planning
+#
+# Tracks progress of adaptive discovery interview for a new feature/bug/refactoring.
+# Updated after EACH user response with scoring, values, and remaining gaps.
+#
+# Scoring: 0-100% (how well we understand this aspect)
+# Status: pending → partial → complete
+# Required: true = must reach threshold, false = cover if relevant
+
+# ============================================================================
+# Interview Metadata (Session Recovery)
+# ============================================================================
+interview_metadata:
+  started: "2026-04-13 23:30:00"
+  last_updated: "2026-04-13 23:30:00"
+  status: "completed"
+  can_resume: true
+  current_question_num: 0
+  feature_size: "L"
+
+# ============================================================================
+# Conversation History (for session recovery)
+# ============================================================================
+# Preserves complete Q&A. Update after EVERY user response.
+#
+conversation_history:
+  - question_num: 1
+    timestamp: "2026-04-13 23:35:00"
+    topic: "setup_flow, slots, ui, media_playback"
+    agent_question: |
+      1. Как выглядит настройка приложения?
+      2. Сколько наград одновременно нужно поддерживать?
+      3. Что показывает приложение во время стрима?
+      4. Где воспроизводится медиа?
+    user_answer: |
+      1. Флоу верный. Возможно через приложение тоже можно создавать награды — надо проверить Twitch API.
+      2. Максимально 5 слотов. Типы: маска Snap Camera, конкретный медиафайл, рандомный из папки.
+      3. UI с настройками + короткий лог кто что купил (список).
+      4. Видео со звуком. Воспроизводится через OBS Browser Source.
+    summary: "Флоу настройки подтверждён. 5 слотов MVP. UI = настройки + лог. Медиа через OBS Browser Source."
+  - question_num: 2
+    timestamp: "2026-04-13 23:40:00"
+    topic: "queue, snap_camera_binding, media_formats, error_handling"
+    agent_question: |
+      1. Очередь воспроизведения при одновременных redemptions?
+      2. Привязка hotkey Snap Camera — ручная или автоматическая?
+      3. Форматы и ограничения медиафайлов?
+      4. Что происходит при ошибках (Snap Camera не запущена, файл удалён)?
+    user_answer: |
+      1. Очередь — один за другим.
+      2. Пользователь создаёт награду, в приложении вручную привязывает маску к награде. Маски меняет по желанию.
+      3. Всё что лежит в папке или указано прямым путём — воспроизводится без ограничений.
+      4. Snap Camera не запущена — пользователь сам увидит (нет вебки). Ошибки файлов — в логе заказов статус зелёный/красный, при наведении на красный — расшифровка ошибки.
+    summary: "Очередь подтверждена. Привязка масок ручная в приложении. Любые форматы. Лог с цветными статусами и тултипами ошибок."
+  - question_num: 3
+    timestamp: "2026-04-13 23:45:00"
+    topic: "snap_camera_ui, obs_url, session, autostart"
+    agent_question: |
+      1. Как пользователь выбирает маску — из списка snap-camera-server или вручную ID?
+      2. Browser Source URL — кнопка копирования или просто текст?
+      3. Auto-fulfill redemptions — автоматически после воспроизведения или вручную?
+      4. Сессия и автозапуск при старте Windows?
+    user_answer: |
+      1. Вариант A (список из snap-camera-server) если несложно, иначе B (ввод ID).
+      2. Просто текст с URL достаточно.
+      3. Автоматически: успех → fulfill (подтвердить), ошибка → refund (вернуть баллы).
+      4. Токен сохраняется, при запуске сразу подключён. Автозапуск не нужен, запускает вручную.
+    summary: "Snap Camera — вариант A предпочтителен. URL текстом. Нет автозапуска, токен сохраняется. Auto-fulfill: успех→fulfill, ошибка→cancel+refund."
+  - question_num: 5
+    timestamp: "2026-04-13 23:55:00"
+    topic: "reconnect, slot_edit, empty_folder, queue_limit"
+    agent_question: |
+      1. Потеря соединения с Twitch — автореконнект тихо или с уведомлением?
+      2. Редактирование слота или только удалить+создать?
+      3. Пустая папка → refund + красный лог, достаточно?
+      4. Лимит очереди?
+    user_answer: |
+      1. Уведомление "Соединение потеряно, переподключаюсь..." + авто-реконнект.
+      2. Только удалить и создать новый (проще).
+      3. Да, достаточно.
+      4. Лимиты через настройки самой награды в Twitch (cooldown, раз в час и т.п.). При создании награды в приложении — указывать эти параметры сразу.
+    summary: "Реконнект с уведомлением. Слоты без редактирования. Cooldown через Twitch reward settings при создании."
+  - question_num: 8
+    timestamp: "2026-04-14 00:10:00"
+    topic: "tech_stack, affiliate, mask_duration, snap_camera_mechanism"
+    agent_question: |
+      1. Технологический стек?
+      2. Twitch Affiliate или Partner?
+      3. Маска в очереди — мгновенно или с паузой?
+      4. Snap Camera — SendInput или API?
+    user_answer: |
+      1. Electron (TypeScript).
+      2. Affiliate.
+      3. Маска висит 30 секунд, затем снимается — лицо без маски. Если в очереди две маски — вторая начинается после истечения 30 сек первой.
+      4. Подтверждает SendInput с hotkey.
+    summary: "Electron. Affiliate — Channel Points API доступен. Маска 30 сек затем снимается (no mask). SendInput подтверждён."
+  - question_num: 4
+    timestamp: "2026-04-13 23:50:00"
+    topic: "success_criteria, slot_toggle, constraints"
+    agent_question: |
+      1. Что значит MVP готов?
+      2. Можно ли отключать слоты не удаляя?
+      3. Windows версия и права администратора?
+    user_answer: |
+      1. Залогинился, настроил по одной награде каждого типа, всё работает без сбоев.
+      2. Да, добавить в MVP — toggle включить/выключить слот.
+      3. Windows 11 у него, делаем как лучше (Windows 10+). Без лишних требований.
+    summary: "MVP критерии подтверждены. Toggle слотов в MVP. Windows 10+ без требований к admin правам."
+# Format:
+# - question_num: 1
+#   timestamp: "2025-11-12 15:20:33"
+#   topic: "user_problem"
+#   agent_question: |
+#     [Full question text]
+#   user_answer: |
+#     [Full answer text]
+#   summary: "Brief summary"
+
+# ============================================================================
+# Phase 1: High-Level Feature Understanding
+# ============================================================================
+# Interview Cycle 1 scope
+phase1_feature_overview:
+
+  feature_name:
+    score: 100
+    status: "complete"
+    value: "twitch-helper"
+    gaps: ""
+    required: true
+
+  feature_description:
+    score: 80
+    status: "partial"
+    value: "Портативное Windows-приложение для стримеров. 3 типа действий за баллы канала: смена маски Snap Camera (через hotkey), воспроизведение конкретного медиафайла, рандомный медиафайл из папки. Twitch OAuth логин. Медиа через OBS Browser Source. До 5 слотов в MVP."
+    gaps: "Нет деталей про очередь воспроизведения и edge cases"
+    required: true
+
+  work_type:
+    score: 100
+    status: "complete"
+    value: "feature (новый проект, MVP)"
+    gaps: ""
+    required: true
+
+  user_problem:
+    score: 85
+    status: "complete"
+    value: "SoundAlerts заблокирован РКН, нет инструмента для воспроизведения медиа на стриме за баллы. Также хочет интерактив с масками Snap Camera за баллы канала."
+    gaps: ""
+    required: true
+
+  target_users:
+    score: 80
+    status: "complete"
+    value: "Twitch стример (в первую очередь сам разработчик), Windows ПК"
+    gaps: ""
+    required: false
+
+  success_criteria:
+    score: 85
+    status: "complete"
+    value: "Пользователь логинится, настраивает по одной награде каждого типа (маска/медиа/мем), все три работают без сбоев. Toggle включить/выключить слот без удаления."
+    gaps: ""
+    required: true
+
+  constraints:
+    score: 85
+    status: "complete"
+    value: "Портативное Windows 10+ приложение, без инсталлятора, без требований к admin правам. До 5 слотов в MVP. Без автозапуска."
+    gaps: ""
+    required: true
+
+  testing_strategy:
+    score: 90
+    status: "complete"
+    value: "Unit-тесты (логика очереди, ошибки, конфиг) + интеграционные (Twitch EventSub, локальный HTTP-сервер). E2E не делаем в MVP."
+    gaps: ""
+    required: true
+
+# ============================================================================
+# Phase 2: User Experience & Scenarios
+# ============================================================================
+# Interview Cycle 2 scope (together with Phase 3)
+phase2_user_experience:
+
+  user_stories:
+    score: 90
+    status: "complete"
+    value: |
+      1. Первый запуск: логин через Twitch → главный экран с секциями Snap Camera / Media
+      2. Добавление слота: выбор типа (Маска/Медиафайл/Мем) → создать или выбрать награду Twitch (с cooldown) → настройка → сохранить → toggle вкл/выкл
+      3. Удаление слота: удалить → создать заново
+      4. Во время стрима: зритель выкупает → очередь FIFO → воспроизведение в OBS overlay (случайная позиция+угол, фикс размер) / переключение маски → fulfill или cancel → лог со статусом
+      5. Потеря соединения: уведомление → авто-реконнект → продолжение работы
+    gaps: ""
+    required: true
+
+  acceptance_criteria:
+    score: 90
+    status: "complete"
+    value: |
+      - Логин через Twitch, токен сохраняется между запусками
+      - Создание награды Twitch из приложения с cooldown-настройками
+      - Слот Маска: переключает маску в Snap Camera через hotkey (с подсказкой как настроить в Snap Camera)
+      - Слот Медиафайл: воспроизводит видео в OBS Browser Source (случайная позиция+угол, фикс размер)
+      - Слот Рандомный мем: воспроизводит случайный файл из папки в OBS Browser Source (случайная позиция+угол, фикс размер)
+      - Очередь: несколько выкупов играют по порядку
+      - Успешный выкуп → fulfill (баллы списаны)
+      - Ошибочный выкуп → cancel (баллы возвращены) + красный статус в логе с тултипом
+      - Toggle вкл/выкл слота без удаления настроек
+      - При потере Twitch-соединения: уведомление + авто-реконнект
+      - Overlay прозрачный когда нет воспроизведения
+      - config.json сохраняется между перезапусками exe
+    gaps: ""
+    required: true
+
+  edge_cases:
+    score: 95
+    status: "complete"
+    value: "Одновременные redemptions → очередь FIFO. Файл не найден → cancel+refund+красный лог. Пустая папка → cancel+refund+красный лог. Нет лимита очереди в приложении — лимиты задаются через cooldown/ограничения Twitch reward при создании. Маска длится 30 сек, затем снимается (лицо без маски). Две маски подряд → вторая применяется после 30 сек первой."
+    gaps: ""
+    required: true
+
+  error_scenarios:
+    score: 85
+    status: "complete"
+    value: "Файл не найден → refund+красный лог с тултипом. Snap Camera не запущена → пользователь видит сам. Overlay закрыт → прозрачный фон. Потеря Twitch-соединения → уведомление 'Переподключаюсь...' + авто-реконнект. Ошибка создания награды → показать ошибку в UI."
+    gaps: ""
+    required: true
+
+  verification_strategy:
+    score: 90
+    status: "complete"
+    value: "Ручная проверка: логин → создать награду → выкупить с другого аккаунта → видео в OBS → выкупить сломанный слот → refund + красный лог."
+    gaps: ""
+    required: true
+
+  ui_ux_requirements:
+    score: 80
+    status: "complete"
+    value: "Главный экран: секции Snap Camera и Media. Лог событий: время/ник/награда/статус 🟢🔴 с тултипом ошибки. URL для OBS текстом. Portable exe."
+    gaps: ""
+    required: false
+
+  risks:
+    score: 85
+    status: "complete"
+    value: "Twitch API изменения — только личное использование, готов к нюансам. Snap Camera не запущена — видит сам. Потеря соединения — авто-реконнект + уведомление. Файлы недоступны — refund + лог. Автообновление — нужно."
+    gaps: ""
+    required: true
+
+  technical_decisions:
+    score: 95
+    status: "complete"
+    value: "Стек: Electron (TypeScript). Snap Camera — SendInput hotkey (snap-camera-server не умеет переключать маску). Список линз — из snap-camera-server API (вариант A). Overlay через локальный HTTP+WebSocket. Auto-fulfill/cancel через Twitch API. Пользователь Affiliate — Channel Points API доступен. Маска висит 30 секунд в очереди. Автообновление — не в MVP."
+    gaps: ""
+    required: false
+
+  deploy_approach:
+    score: 90
+    status: "complete"
+    value: "Портативный .exe, скачивается и запускается. Нет инсталлятора, нет CI/CD деплоя."
+    gaps: ""
+    required: false
+
+  manual_user_actions:
+    score: 80
+    status: "complete"
+    value: "Разработчик регистрирует Twitch App на dev.twitch.tv (один раз). Пользователь: логин через Twitch в приложении, настроить snap-camera-server локально, добавить Browser Source в OBS по URL из приложения."
+    gaps: ""
+    required: false
+
+# ============================================================================
+# Phase 3: Integration & Technical Context
+# ============================================================================
+# Interview Cycle 2 scope (together with Phase 2)
+phase3_integration:
+
+  integration_points:
+    score: 85
+    status: "complete"
+    value: "Twitch EventSub WebSocket (channel point redemptions), Twitch API (создание/fulfill/cancel наград), snap-camera-server локальный API (список линз), локальный HTTP+WebSocket сервер (OBS Browser Source overlay), Windows SendInput API (симуляция hotkey для Snap Camera), автообновление (GitHub Releases)."
+    gaps: ""
+    required: true
+
+  dependencies:
+    score: 85
+    status: "complete"
+    value: "snap-camera-server запущен локально, OBS с Browser Source, Twitch-аккаунт стримера."
+    gaps: ""
+    required: false
+
+  technical_constraints:
+    score: 80
+    status: "complete"
+    value: "Windows 10+, без прав администратора, портативный exe. Twitch OAuth только для личного использования (no partner/affiliate requirements)."
+    gaps: ""
+    required: false
+
+  data_requirements:
+    score: 90
+    status: "complete"
+    value: "config.json рядом с .exe: конфиг слотов (тип/награда/файл/папка/toggle/cooldown). auth.json рядом с .exe: OAuth токен. Лог событий — только в памяти сессии, не персистентный."
+    gaps: ""
+    required: false
+
+  migration_needs:
+    score: 100
+    status: "complete"
+    value: "Новый проект, миграции не нужны."
+    gaps: ""
+    required: false
+
+# ============================================================================
+# Phase 4: Completion
+# ============================================================================
+phase4_completion:
+  userspec_file: ""  # work/{feature}/user-spec.md
+  status: "pending"  # pending | created | approved
+
+# ============================================================================
+# Decision Rules
+# ============================================================================
+decision_rules:
+
+  required_threshold: 85
+  optional_threshold: 50
+
+  # Stop criteria (BOTH must be true to exit a cycle)
+  stop_criteria:
+    - "All required items in current cycle scope score >= 85%"
+    - "Structural: every required item has non-empty value, no TBD, gaps empty or conscious limitations"
+
+  priority_order:
+    - "Required items with score < 85% (lowest score first)"
+    - "Optional items mentioned by user in context"
+    - "Other optional items if user seems knowledgeable"
+
+  question_strategy:
+    - "3-4 questions per batch about different gaps"
+    - "Run as many batches as needed — batch size is NOT cycle limit"
+    - "Propose solutions based on PK, not just ask questions"
+    - "Challenge with substance: counterexamples, code references, unexplored scenarios"
+    - "After each response: update scores, values, gaps, conversation_history, save"
+
+# ============================================================================
+# Interview Progress
+# ============================================================================
+progress:
+  current_phase: "phase1_feature_overview"
+  questions_asked: 0
+  last_question: ""
+  total_required_score: 0
+  total_optional_score: 0
+  completion_estimate: "0%"
+  user_detail_level: "unknown"  # brief | moderate | detailed
+
+# ============================================================================
+# Notes
+# ============================================================================
+notes: |
+  Free-form notes:
+  - Important insights
+  - Areas of uncertainty
+  - Pivot points
+  - Scope changes
+
+# ============================================================================
+# USAGE INSTRUCTIONS
+# ============================================================================
+#
+# 1. INIT: Created by init-feature-folder.sh at work/{feature}/logs/userspec/interview.yml
+#    Set metadata.started, metadata.status: in_progress
+#
+# 2. INITIAL SCORING: After user's free-form description, score ALL items
+#    Detailed 80-95%, brief 50-70%, vague 20-40%, not mentioned 0%
+#
+# 3. INTERVIEW LOOP (save after EVERY response):
+#    a) Find required items with score < 85% in current cycle scope
+#    b) Ask 3-4 questions about different gaps
+#    c) Propose solutions based on PK
+#    d) User answers
+#    e) Update: conversation_history, scores, values, gaps, metadata
+#    f) Save immediately
+#    g) Check stop criteria (score >= 85% AND structural: value filled, no TBD, gaps resolved)
+#    h) Not done → repeat. Done → next cycle.
+#
+# 4. CYCLES:
+#    Cycle 1: phase1_feature_overview items
+#    Cycle 2: phase2_user_experience + phase3_integration items
+#    Cycle 3: ALL items still below threshold (cleanup pass)
+#
+# 5. RESUME: If metadata.status is "in_progress"
+#    Load, show conversation summary, resume from current state
+#
+# 6. COMPLETION: After user approves user-spec.md
+#    Set phase4_completion.status: approved
+#    Set metadata.status: completed

@@ -180,8 +180,12 @@ describe('EventSubClient', () => {
     client.connect('ws://mock');
     await flush();
 
+    // Capture the original WS instance BEFORE the watchdog fires.
+    const originalWs = mockWsInstance;
+    const closeSpy = jest.spyOn(originalWs, 'close');
+
     // Welcome with 10s keepalive (watchdog = 10+5 = 15s).
-    mockWsInstance.emit('message', Buffer.from(makeWelcomeMsg('sess-1', 10)));
+    originalWs.emit('message', Buffer.from(makeWelcomeMsg('sess-1', 10)));
     await flush();
 
     // Advance past watchdog window.
@@ -190,10 +194,18 @@ describe('EventSubClient', () => {
     // Flush microtasks for MockWs.close() → emit('close').
     await flush();
 
+    // (a) ws.close() must have been called — watchdog fired.
+    expect(closeSpy).toHaveBeenCalled();
+
     // disconnected event must have been emitted.
-    // disconnectPromise should already be resolved after flush(); the .race
-    // is just a safety net — not needed with real assertions below.
     await disconnectPromise;
+
+    // Flush the 3s reconnect delay timer.
+    jest.advanceTimersByTime(3_100);
+    await flush();
+
+    // (b) A new WS connection must have been opened (mockWsInstance replaced).
+    expect(mockWsInstance).not.toBe(originalWs);
   });
 
   test('notification_emits_redemption_event', async () => {

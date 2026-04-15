@@ -1,0 +1,55 @@
+{
+  "summary": {
+    "total_areas": 10,
+    "covered": 10,
+    "gaps": 5,
+    "critical": 2,
+    "major": 3,
+    "minor": 1
+  },
+  "findings": [
+    {
+      "area": "AuthStore / checkAuthOnStartup — token expiry+refresh+IPC logout flow",
+      "severity": "critical",
+      "issue": "checkAuthOnStartup (src/main/ipc/auth.ts) had zero tests. The function detects expired tokens, calls refreshToken, and on failure must (a) call deleteTokens and (b) broadcast auth:logout IPC to all renderer windows. twitch-auth.test.ts only tested isTokenExpired() in isolation and had one test that verified refreshToken() throws and deletePassword is called — but never tested the full checkAuthOnStartup pipeline, so the auth:logout IPC broadcast assertion was completely absent. Additionally, a source bug was uncovered: getTokens() can return null but the destructure `const { refreshToken } = await authStore.getTokens()` on line 51 of ipc/auth.ts would throw a TypeError — the null-case path (no_refresh_token → broadcast logout) was unreachable due to this crash.",
+      "fix": "Added four new tests in describe('checkAuthOnStartup') block in tests/unit/twitch-auth.test.ts: (1) does_nothing_when_token_not_expired — asserts fetch NOT called; (2) expired_token_calls_refreshToken_with_stored_refresh — asserts keytar.setPassword called with new tokens; (3) failed_refresh_calls_deleteTokens_and_broadcasts_auth_logout — asserts keytar.deletePassword called AND mockWin.webContents.send called with 'auth:logout'; (4) no_refresh_token_broadcasts_auth_logout_without_api_call — asserts fetch NOT called AND auth:logout broadcast. Also fixed source bug in src/main/ipc/auth.ts:51 — changed `const { refreshToken } = await authStore.getTokens()` to `const tokens = await authStore.getTokens(); const refreshToken = tokens?.refreshToken` to safely handle null return."
+    },
+    {
+      "area": "TwitchClient / EventSubClient — keepalive watchdog mechanism",
+      "severity": "critical",
+      "issue": "tests/unit/eventsub.test.ts:174 test 'keepalive_watchdog_reconnects_after_60s' only awaited the 'disconnected' event. It did NOT assert (a) that ws.close() was actually called by the watchdog timer, nor (b) that a new WS connection was opened after the reconnect delay. A test that only checks an event fires without verifying the mechanism (close + reconnect) can pass even if the watchdog fires close() on the wrong object or if the reconnect path is broken. Litmus test: removing the _resetWatchdog() call in _openConnection would still eventually emit 'disconnected' via WS natural close — the test would not catch the regression.",
+      "fix": "Extended tests/unit/eventsub.test.ts keepalive_watchdog_reconnects_after_60s: captured originalWs before the watchdog fires; added jest.spyOn(originalWs, 'close') to verify (a) ws.close() called; after disconnectPromise resolves, advanced timers by 3100ms and flushed microtasks to trigger the reconnect setTimeout; added assertion (b) mockWsInstance !== originalWs to verify a new WS instance was created."
+    },
+    {
+      "area": "MaskAction — hotkey execution ORDER relative to timer advance",
+      "severity": "major",
+      "issue": "tests/unit/mask-action.test.ts:82 test 'full_sequence_with_fake_timers' verified both keyTap calls occurred but lacked explicit call-order assertions. Specifically: (1) no assertion that keyTap was called exactly once BEFORE advanceTimersByTime (only checks after both calls complete); (2) no assertion that fulfillRedemption was NOT called before the timer advance; (3) no assertion on the specific call indices of mock.calls[]. A test that only checks the final state of both calls combined — not the intermediate state between them — fails the litmus test: removing the post-timer step (the remove-mask hotkey) would not change the apply-hotkey call count at the pre-timer checkpoint.",
+      "fix": "Rewrote the assertion block in tests/unit/mask-action.test.ts full_sequence_with_fake_timers: after execute() called but before advanceTimersByTime: assert keyTap called exactly once and fulfillRedemption not called yet. After advance and await: assert keyTap called exactly twice; assert mock.calls[0] === ['1', ['control','shift']]; assert mock.calls[1] === ['0', ['control','shift']]; assert fulfillRedemption called exactly once."
+    },
+    {
+      "area": "Dispatcher — disabled-slot cancel must not invoke action handlers",
+      "severity": "major",
+      "issue": "tests/unit/queue/dispatcher.test.ts:53 test 'disabled_slot_triggers_cancel' verified that cancelRedemption was called for a disabled slot, but did NOT assert that maskHandler and mediaHandler were NOT invoked. This is a critical guard: the point of the disabled check is to prevent action execution. Without the negative assertion, a regression that accidentally calls the handler anyway (e.g., removing the `!slot.enabled` guard in dispatcher.ts) would go undetected — the test would still pass because cancelRedemption would still be called from the handler's error path.",
+      "fix": "Renamed test to 'disabled_slot_triggers_cancel_and_no_action_handler' in tests/unit/queue/dispatcher.test.ts. Registered explicit maskHandler and mediaHandler spies via registerActionHandlers() before dispatch. Added: expect(maskHandler).not.toHaveBeenCalled(); expect(mediaHandler).not.toHaveBeenCalled()."
+    },
+    {
+      "area": "TwitchClient reconnect — session_id assertion quality",
+      "severity": "major",
+      "issue": "tests/unit/eventsub.test.ts:143 test 'reconnect_resubscribes_with_new_session_id' checks that the LAST fetch call body contains 'sess-2'. However it does not assert that the FIRST fetch call used 'sess-1' and not 'sess-2'. If there were a regression where the client cached the old session_id and used it for both subscriptions, both calls would still contain 'sess-1', the last one would NOT contain 'sess-2', and the test would catch it. The existing test IS adequate for this regression. No fix applied — the assertion is sufficient to detect the specific regression (new session_id used for new subscription).",
+      "fix": "No change required — existing assertion is sufficient. Noted here for completeness."
+    },
+    {
+      "area": "AuthStore — startup expiry check flow tested only at helper level",
+      "severity": "minor",
+      "issue": "tests/unit/twitch-auth.test.ts:110 test 'expired_token_triggers_refresh_on_startup' only tested that authStore.isTokenExpired() returns true for a past tokenExpiresAt value. This is a unit test of the isTokenExpired helper, not a test of the startup flow. The test name is misleading — it does not test that a refresh is triggered. This was a structural gap superseded by the critical finding above and resolved by the checkAuthOnStartup test suite addition.",
+      "fix": "Misleading test retained as-is (it is a valid unit test of isTokenExpired). The actual startup flow is now covered by the new checkAuthOnStartup describe block."
+    }
+  ],
+  "fixes_applied": [
+    "tests/unit/mask-action.test.ts — rewrote full_sequence_with_fake_timers to add pre-advance checkpoint (keyTap called once, fulfillRedemption not yet called), post-advance call-count assertion (keyTap called twice), and explicit call-index order assertions on mock.calls[0] and mock.calls[1]",
+    "tests/unit/queue/dispatcher.test.ts — renamed disabled_slot_triggers_cancel to disabled_slot_triggers_cancel_and_no_action_handler; registered maskHandler/mediaHandler spies; added expect(maskHandler).not.toHaveBeenCalled() and expect(mediaHandler).not.toHaveBeenCalled()",
+    "tests/unit/twitch-auth.test.ts — added import of KeytarLike and checkAuthOnStartup; added full describe('checkAuthOnStartup') suite with 4 tests: does_nothing_when_token_not_expired, expired_token_calls_refreshToken_with_stored_refresh, failed_refresh_calls_deleteTokens_and_broadcasts_auth_logout, no_refresh_token_broadcasts_auth_logout_without_api_call",
+    "tests/unit/eventsub.test.ts — extended keepalive_watchdog_reconnects_after_60s: captured originalWs, added close() spy, asserted ws.close() called after timer advance, advanced reconnect timer, asserted new WS instance created (mockWsInstance !== originalWs)",
+    "src/main/ipc/auth.ts — fixed source bug on line 51: changed destructuring of potentially-null getTokens() return to safe optional chaining (tokens?.refreshToken) to prevent TypeError when no tokens are stored"
+  ]
+}

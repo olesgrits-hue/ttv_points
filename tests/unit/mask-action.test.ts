@@ -82,16 +82,24 @@ describe('MaskAction', () => {
   test('full_sequence_with_fake_timers', async () => {
     const executePromise = action.execute(mockSlot, mockRedemption);
 
-    // Apply hotkey should have fired immediately.
+    // (a) Apply hotkey must fire IMMEDIATELY — before any timer advance.
+    expect(robotMock.keyTap).toHaveBeenCalledTimes(1);
     expect(robotMock.keyTap).toHaveBeenCalledWith('1', ['control', 'shift']);
+    // fulfillRedemption must NOT have been called yet (mask still active).
+    expect(mockTwitchApi.fulfillRedemption).not.toHaveBeenCalled();
 
-    // Advance 30 seconds.
+    // (b) Advance 30 seconds — triggers remove-mask + fulfill.
     jest.advanceTimersByTime(30_000);
 
     await executePromise;
 
-    // Remove mask hotkey (ctrl+shift+0) should have fired.
-    expect(robotMock.keyTap).toHaveBeenCalledWith('0', ['control', 'shift']);
+    // (c) Remove mask hotkey (ctrl+shift+0) must have fired AFTER the advance.
+    expect(robotMock.keyTap).toHaveBeenCalledTimes(2);
+    // Verify call ORDER: first call = apply (index 0), second call = remove (index 1).
+    expect(robotMock.keyTap.mock.calls[0]).toEqual(['1', ['control', 'shift']]);
+    expect(robotMock.keyTap.mock.calls[1]).toEqual(['0', ['control', 'shift']]);
+    // fulfillRedemption called exactly once after the sequence.
+    expect(mockTwitchApi.fulfillRedemption).toHaveBeenCalledTimes(1);
     expect(mockTwitchApi.fulfillRedemption).toHaveBeenCalledWith('reward-1', 'redemption-1');
     expect(mockTwitchApi.cancelRedemption).not.toHaveBeenCalled();
   });

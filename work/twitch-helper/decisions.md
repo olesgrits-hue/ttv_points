@@ -200,6 +200,21 @@ Agent reports on completed tasks. Each entry is written by the agent that execut
 
 ---
 
+## Task 14: Test Audit
+
+**Status:** Done
+**Commit:** (Wave 6 commit)
+**Agent:** main agent + test-reviewer subagent
+**Summary:** Test audit found 2 critical gaps and 3 major gaps, all fixed. Critical: (1) zero tests for `checkAuthOnStartup` expiry→refresh→logout pipeline — added full suite of 4 tests; (2) fixed real source bug in `ipc/auth.ts:51` — null destructure in `checkAuthOnStartup` (tokens?.refreshToken). Major: (3) keepalive watchdog test only asserted `disconnected` event, not `ws.close()` or new WS reconnect — extended; (4) disabled-slot dispatcher test had no assertion that action handlers were NOT called — added handler spies; (5) MaskAction sequence test had no call-order assertions before/after timer advance — rewrote to assert apply→advance→remove→fulfill in order. All tests pass: 113 total (4 new vs 109 before audit).
+**Deviations:** None.
+
+**Reviews:** Skipped (audit task, test-reviewer subagent performed the audit).
+
+**Verification:**
+- `npm test` → 113 passed after all fixes
+
+---
+
 <!-- Entries are added by agents as tasks are completed.
 
 Format is strict — use only these sections, do not add others.
