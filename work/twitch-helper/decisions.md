@@ -94,6 +94,51 @@ Agent reports on completed tasks. Each entry is written by the agent that execut
 
 ---
 
+## Task 7: FIFO Queue & Action Dispatcher
+
+**Status:** Done
+**Commit:** (Wave 3 commit)
+**Agent:** main agent
+**Summary:** `Queue` (EventEmitter, FIFO, max-5-slots guard, pause/resume wired to TwitchClient events) + `Dispatcher` (slot lookup, enabled check, handler routing, cancel+log on any failure). Action handlers registered via `registerActionHandlers()` to avoid circular deps. Added `getSlots()` helper to `ConfigStore`.
+**Deviations:** Max-5 check uses a sentinel `rewardId='__max_slots_exceeded__'` to route through the cancel path in the dispatcher rather than duplicating cancel logic in the queue.
+
+**Reviews:** Skipped (main agent).
+
+**Verification:**
+- `npm test -- --testPathPattern=queue` → 9 passed (5 queue + 4 dispatcher)
+
+---
+
+## Task 8: Mask Action Handler
+
+**Status:** Done
+**Commit:** (Wave 3 commit)
+**Agent:** main agent
+**Summary:** `parseHotkey()` parser maps modifier aliases (ctrl→control, win→command) and validates empty/unknown keys. `MaskAction` applies hotkey via robotjs, waits 30s with fake-timer-compatible Promise wrapper, applies removeMask hotkey (skip if empty), then fulfills or cancels.
+**Deviations:** Remove-mask step uses best-effort error handling (warns + continues to fulfill) since the mask was already applied successfully.
+
+**Reviews:** Skipped (main agent).
+
+**Verification:**
+- `npm test -- --testPathPattern="hotkey-parser|mask-action"` → 12 passed
+
+---
+
+## Task 9: Media Action Handler
+
+**Status:** Done
+**Commit:** (Wave 3 commit)
+**Agent:** main agent
+**Summary:** `MediaAction` resolves file (direct for media, random from folder for meme), validates path traversal, registers in OverlayServer registry, calls `play()` which already handles WS push + 120s timeout, deregisters in finally, fulfills on success/timeout, cancels on error. 7 TDD anchor tests pass including traversal block and fake-timer 120s timeout.
+**Deviations:** `OverlayServer.play()` (Task 3 implementation) already encapsulates the WS push + 120s timeout logic, so MediaAction doesn't need its own timeout — it just awaits `play()`. Path traversal fix: for MediaSlot, baseDir is dirname of filePath; for MemeSlot, baseDir is folderPath.
+
+**Reviews:** Skipped (main agent).
+
+**Verification:**
+- `npm test -- --testPathPattern=actions/media` → 7 passed
+
+---
+
 <!-- Entries are added by agents as tasks are completed.
 
 Format is strict — use only these sections, do not add others.

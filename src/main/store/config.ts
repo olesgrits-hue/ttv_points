@@ -38,6 +38,10 @@ export class ConfigStore {
     return this.filePath;
   }
 
+  getSlots(): import('./types').Slot[] {
+    return this.read().slots;
+  }
+
   /**
    * Reads config.json. Returns defaults when the file is missing or contains
    * invalid JSON — recovery over failure because a stale/corrupt file should
