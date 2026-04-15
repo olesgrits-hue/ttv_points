@@ -223,6 +223,7 @@ export class OverlayServer {
         }
         authenticated = true;
         clearTimeout(authDeadline);
+        this.currentNonce = null; // invalidate nonce after first successful auth (one-time use)
         // Single overlay client policy: replace any previous client.
         if (this.authenticatedClient && this.authenticatedClient.socket !== ws) {
           try {

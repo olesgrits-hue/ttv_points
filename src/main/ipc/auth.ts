@@ -17,9 +17,9 @@ export function registerAuthIpcHandlers(
   });
 
   ipcMain.handle('auth:check', async () => {
+    const tokens = await authStore.getTokens();
+    if (!tokens?.accessToken) return false;
     const cfg = configStore.read();
-    const { accessToken } = await authStore.getTokens();
-    if (!accessToken) return false;
     // Token exists and has not expired → authenticated.
     return !authStore.isTokenExpired(cfg);
   });

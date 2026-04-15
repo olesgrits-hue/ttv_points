@@ -185,6 +185,21 @@ Agent reports on completed tasks. Each entry is written by the agent that execut
 
 ---
 
+## Task 13: Security Audit
+
+**Status:** Done
+**Commit:** (Wave 6 commit)
+**Agent:** main agent + security-auditor subagent
+**Summary:** Security audit per OWASP Top 10 found 3 critical and 4 high issues. Fixed: (H1) `auth:check` IPC crashed on null from `getTokens()` — added null guard; (H2) WebSocket nonce was never invalidated after auth — now cleared to null immediately after successful auth; (H3+C2) `slots.ts` IPC handlers accepted renderer payloads without runtime validation — added strict field-by-field validation with type assertions for all create/delete/toggle handlers; (H4) `snap:search` had no max query length — added 200-char limit. Two items deferred: (C1) `MediaSlot` path traversal check is tautological (dirname of the same file), mitigated by the fact that file paths are sourced exclusively from Electron's native `dialog.showOpenDialog` — no renderer-controlled string reaches this path outside the dialog; (C3) Electron 33.x has 14 high CVEs — updating requires full regression and is deferred to a separate maintenance task before production deploy.
+**Deviations:** None.
+
+**Reviews:** Skipped (audit task, security-auditor subagent performed the audit).
+
+**Verification:**
+- `npm test` → 109 passed after all fixes
+
+---
+
 <!-- Entries are added by agents as tasks are completed.
 
 Format is strict — use only these sections, do not add others.
