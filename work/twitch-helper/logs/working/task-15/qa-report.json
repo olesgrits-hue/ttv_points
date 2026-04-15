@@ -1,0 +1,91 @@
+{
+  "task": 15,
+  "date": "2026-04-15",
+  "result": "pass",
+  "criteria": [
+    {
+      "id": 1,
+      "description": "npm test passes (exit 0, all tests green)",
+      "status": "pass",
+      "notes": "19 test suites, 113/113 tests passed in 2.937s. 0 failures, 0 skipped."
+    },
+    {
+      "id": 2,
+      "description": "config.json written to PORTABLE_EXECUTABLE_DIR in packaged mode, cwd in dev",
+      "status": "pass",
+      "notes": "src/main/store/config.ts:15-25 resolveConfigDir() returns process.env.PORTABLE_EXECUTABLE_DIR when isPackaged, falls back to process.cwd()."
+    },
+    {
+      "id": 3,
+      "description": "OAuth access_token and refresh_token stored via keytar, never written to config.json",
+      "status": "pass",
+      "notes": "src/main/store/auth.ts:46-55 saveTokens() calls keytar.setPassword for both KEYTAR_ACCOUNT_ACCESS and KEYTAR_ACCOUNT_REFRESH. config.ts Config type (via normalize()) does not serialize any access_token/refresh_token fields."
+    },
+    {
+      "id": 4,
+      "description": "GET /overlay returns 200 with background:transparent HTML",
+      "status": "pass",
+      "notes": "server.ts:166-175 sends 200 with overlay HTML; src/overlay/index.html:13 sets body { background: transparent; }."
+    },
+    {
+      "id": 5,
+      "description": "GET /media/:id returns 200 for registered file, 404 after deregister",
+      "status": "pass",
+      "notes": "server.ts:177-195 handles /media/:id with registry.resolve() -> 404 if missing, sendFile otherwise. Integration tests tests/integration/overlay-server.test.ts:100 (get_media_returns_file), :115 (get_media_404_after_deregister), :127 (get_media_404_for_unknown_id) all pass."
+    },
+    {
+      "id": 6,
+      "description": "EventSub subscription POST fires on session_welcome (within 10s)",
+      "status": "pass",
+      "notes": "src/main/twitch/eventsub.ts:135-143: on 'session_welcome' calls _subscribe() synchronously. Test tests/unit/eventsub.test.ts:117 'parses_session_welcome_and_subscribes' verifies POST to eventsub/subscriptions endpoint."
+    },
+    {
+      "id": 7,
+      "description": "Queue processes redemptions in FIFO order",
+      "status": "pass",
+      "notes": "tests/unit/queue/queue.test.ts:63 'fifo_order' enqueues A,B,C and asserts order.toEqual(['A','B','C'])."
+    },
+    {
+      "id": 8,
+      "description": "6th queue slot rejected/cancelled when queue at max 5",
+      "status": "pass",
+      "notes": "tests/unit/queue/queue.test.ts:95 'max_5_slots_rejected' enqueues an over-limit redemption and asserts api.cancelRedemption called (queue.test.ts:114)."
+    },
+    {
+      "id": 9,
+      "description": "MaskAction fires remove-mask hotkey after 30s via fake timers",
+      "status": "pass",
+      "notes": "tests/unit/mask-action.test.ts:92 jest.advanceTimersByTime(30_000) then asserts remove hotkey invoked (call index 1) and fulfillRedemption called exactly once."
+    },
+    {
+      "id": 10,
+      "description": "MediaAction cancels redemption on empty meme folder",
+      "status": "pass",
+      "notes": "tests/actions/media.test.ts:103 'empty meme folder triggers cancel and refund' asserts api.cancelRedemption.toHaveBeenCalledWith('reward-1','redemption-1') and fulfillRedemption NOT called."
+    },
+    {
+      "id": 11,
+      "description": "MediaAction 120s playback timeout fulfills redemption",
+      "status": "pass",
+      "notes": "tests/actions/media.test.ts:163 jest.advanceTimersByTime(120_000) then asserts api.fulfillRedemption called. Server-side timeout at overlay/server.ts:141 PLAYBACK_TIMEOUT_MS=120_000."
+    },
+    {
+      "id": 12,
+      "description": "Path traversal attempt (../../../etc) is blocked",
+      "status": "pass",
+      "notes": "tests/actions/media.test.ts:176 'path traversal attempt is blocked' asserts cancelRedemption called. Defense-in-depth in server.ts:180 rejects ids matching /[\\\\/]|\\.\\./."
+    },
+    {
+      "id": 13,
+      "description": "WebSocket rejects unauthenticated / wrong-nonce connections",
+      "status": "pass",
+      "notes": "tests/integration/overlay-server.test.ts:166 'ws_unauthenticated_closed' and :180 'ws_wrong_nonce_closed' both close WS with 1008. Implementation at server.ts:219-223."
+    },
+    {
+      "id": 14,
+      "description": "Electron BrowserWindow uses contextIsolation, sandbox, nodeIntegration=false",
+      "status": "pass",
+      "notes": "src/main/window.ts:15-17: contextIsolation: true, sandbox: true, nodeIntegration: false — all security flags set correctly."
+    }
+  ]
+}

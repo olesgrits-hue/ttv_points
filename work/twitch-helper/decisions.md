@@ -215,6 +215,23 @@ Agent reports on completed tasks. Each entry is written by the agent that execut
 
 ---
 
+## Task 15: Pre-deploy QA
+
+**Status:** Done
+**Commit:** (Wave 7 commit)
+**Agent:** main agent + pre-deploy-qa subagent
+**Summary:** All 14 acceptance criteria passed. 113/113 tests green. Config path resolves via `PORTABLE_EXECUTABLE_DIR`; tokens in keytar only; `/overlay` returns 200 with `background: transparent`; media endpoints 200/404 verified; EventSub subscription fires on `session_welcome`; FIFO + max-5-slots enforced; MaskAction 30s sequence correct; MediaAction empty-folder cancel + 120s fulfill + path traversal block all covered; WS rejects unauthenticated; Electron security flags confirmed. Feature is production-ready.
+**Deviations:** None.
+
+**Reviews:** Skipped (QA task).
+
+**Verification:**
+- `npm test` → 113 passed
+- All 14 acceptance criteria: PASS
+- QA report: [logs/working/task-15/qa-report.json](logs/working/task-15/qa-report.json)
+
+---
+
 <!-- Entries are added by agents as tasks are completed.
 
 Format is strict — use only these sections, do not add others.
