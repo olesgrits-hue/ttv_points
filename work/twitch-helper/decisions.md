@@ -154,6 +154,22 @@ Agent reports on completed tasks. Each entry is written by the agent that execut
 
 ---
 
+## Task 11: Slot Management UI
+
+**Status:** Done
+**Commit:** (Wave 5 commit)
+**Agent:** main agent
+**Summary:** Created `SlotCard`, `SlotForm`, `LensSearch` components. `SlotCard` shows type badge (Маска/Медиафайл/Мем), reward title, summary line, toggle checkbox, delete button. `SlotForm` is a modal with progressive disclosure: type picker → reward selector (existing dropdown or new name/cost/cooldown) → type-specific fields (LensSearch+hotkey, file browse, folder browse). `LensSearch` debounces 300ms, ignores stale responses by query-ref comparison. `MainScreen` updated to load slots on mount, render `SlotCard` per section, show `SlotForm` modal, disable "Добавить слот" at limit 5. Added `src/main/ipc/slots.ts` with slots:list/create/delete/toggle, rewards:list/create, dialog:openFile/openFolder handlers.
+**Deviations:** `snap:search` IPC already registered in Task 6 (`src/main/ipc/snap.ts`); preload unwraps `{ query }` → bare string to match the existing handler signature.
+
+**Reviews:** Skipped (main agent).
+
+**Verification:**
+- `npm test -- --testPathPattern=tests/renderer/(SlotCard|SlotForm|LensSearch)` → 17 passed
+- `npm test` → 109 passed
+
+---
+
 <!-- Entries are added by agents as tasks are completed.
 
 Format is strict — use only these sections, do not add others.
