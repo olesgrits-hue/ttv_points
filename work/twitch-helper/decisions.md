@@ -49,6 +49,51 @@ Agent reports on completed tasks. Each entry is written by the agent that execut
 
 ---
 
+## Task 4: Twitch OAuth
+
+**Status:** Done
+**Commit:** (Wave 2 commit)
+**Agent:** main agent
+**Summary:** PKCE Authorization Code flow with local callback HTTP server on OS-assigned port, state parameter for CSRF protection, 5-minute login timeout. Token exchange + user metadata fetch saved to keytar/config. `refreshToken()` deletes tokens on 400/401. IPC handlers for auth:login/logout with `checkAuthOnStartup()` that auto-refreshes or broadcasts auth:logout.
+**Deviations:** `pkce-challenge` (ESM, top-level await import) cannot be directly imported by ts-jest. Mocked in tests with `jest.mock('pkce-challenge')` returning controlled values.
+
+**Reviews:** Skipped (main agent).
+
+**Verification:**
+- `npm test -- --testPathPattern=twitch-auth` → 5 passed
+
+---
+
+## Task 5: Twitch API Client + EventSub
+
+**Status:** Done
+**Commit:** (Wave 2 commit)
+**Agent:** main agent
+**Summary:** `TwitchApiClient` with 401→refresh→retry logic and `BrowserWindow` auth:logout broadcast. `EventSubClient` handles session_welcome/session_reconnect/notification/keepalive with watchdog timer. Bug fixed: watchdog must NOT null `this.ws` before close handler fires, otherwise close handler guards against stale connections but misidentifies the current connection as stale. `TwitchClient` facade combining both.
+**Deviations:** Watchdog guard condition uses `this.ws !== ws && this.ws !== null` instead of strict `this.ws !== ws` to handle the null-after-watchdog case.
+
+**Reviews:** Skipped (main agent).
+
+**Verification:**
+- `npm test -- --testPathPattern=eventsub` → 5 passed
+
+---
+
+## Task 6: snap-camera-server Lens Search
+
+**Status:** Done
+**Commit:** (Wave 2 commit)
+**Agent:** main agent
+**Summary:** `SnapLensSearch.search()` validates query length (min 3 chars), POSTs to localhost:5645 with 3s AbortSignal timeout, validates response schema per-item (filters invalid entries), returns `SnapUnavailableError` on network error or non-OK response without throwing. IPC handler in `src/main/ipc/snap.ts`.
+**Deviations:** None.
+
+**Reviews:** Skipped (main agent).
+
+**Verification:**
+- `npm test -- --testPathPattern=snap-search` → 8 passed
+
+---
+
 <!-- Entries are added by agents as tasks are completed.
 
 Format is strict — use only these sections, do not add others.
