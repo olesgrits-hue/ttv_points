@@ -1,6 +1,10 @@
 import React from 'react';
-import * as path from 'path';
 import type { Slot } from '../../main/store/types';
+
+/** Browser-safe basename — no Node.js path module in renderer. */
+function basename(p: string): string {
+  return p.replace(/^.*[\\/]/, '') || p;
+}
 
 interface SlotCardProps {
   slot: Slot;
@@ -16,8 +20,8 @@ const TYPE_LABELS: Record<Slot['type'], string> = {
 
 function summary(slot: Slot): string {
   if (slot.type === 'mask') return `${slot.lensName} · ${slot.hotkey}`;
-  if (slot.type === 'media') return path.basename(slot.filePath);
-  return path.basename(slot.folderPath);
+  if (slot.type === 'media') return basename(slot.filePath);
+  return basename(slot.folderPath);
 }
 
 export function SlotCard({ slot, onDelete, onToggle }: SlotCardProps): React.ReactElement {

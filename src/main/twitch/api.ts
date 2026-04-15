@@ -133,7 +133,12 @@ export class TwitchApiClient {
    * On second 401 (refresh failed) emits auth:logout to all renderer windows.
    */
   private async _fetch(url: string, init: RequestInit = {}): Promise<Response> {
-    const { accessToken } = await this.authStore.getTokens();
+    const tokens = await this.authStore.getTokens();
+    if (!tokens) {
+      _broadcastLogout();
+      return new Response(null, { status: 401 });
+    }
+    const { accessToken } = tokens;
     const cfg = this.configStore.read();
     const clientId = process.env.TWITCH_CLIENT_ID ?? '';
 
@@ -148,21 +153,22 @@ export class TwitchApiClient {
     if (res.status !== 401) return res;
 
     // Attempt refresh.
-    const { refreshToken } = await this.authStore.getTokens();
-    if (!refreshToken) {
+    const tokens2 = await this.authStore.getTokens();
+    if (!tokens2?.refreshToken) {
       _broadcastLogout();
       return res;
     }
 
     try {
-      await this.twitchAuth.refreshToken(refreshToken);
+      await this.twitchAuth.refreshToken(tokens2.refreshToken);
     } catch {
       _broadcastLogout();
       return res;
     }
 
     // Retry with fresh token.
-    const { accessToken: newToken } = await this.authStore.getTokens();
+    const freshTokens = await this.authStore.getTokens();
+    const newToken = freshTokens?.accessToken ?? '';
     const retryHeaders = {
       ...headers,
       Authorization: `Bearer ${newToken}`,

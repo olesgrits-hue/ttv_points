@@ -1,6 +1,8 @@
 import { Slot } from '../store/types';
 
-/** A Twitch Channel Points redemption event as it enters the queue. */
+/** A Twitch Channel Points redemption event as it enters the queue.
+ *  Structurally compatible with eventsub.RedemptionEvent — extra fields are ignored.
+ */
 export interface RedemptionEvent {
   /** Redemption ID — used for fulfill/cancel API calls. */
   id: string;

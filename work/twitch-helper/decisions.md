@@ -170,6 +170,21 @@ Agent reports on completed tasks. Each entry is written by the agent that execut
 
 ---
 
+## Task 12: Code Audit
+
+**Status:** Done
+**Commit:** (Wave 6 commit)
+**Agent:** main agent + code-reviewer subagent
+**Summary:** Full-feature code quality audit revealed 6 critical issues all fixed immediately: (1) `index.ts` was a Task 1 stub — implemented full bootstrap with all singleton instantiation and IPC handler registration; (2) preload subscribed to `twitch:log` but main process emits on `log:entry` — fixed channel name; (3) `snap:search` IPC returned `{id,name}` but renderer expected `{lensId,lensName}` — added mapping in handler; (4) `TwitchApiClient._fetch` destructured `null` from `getTokens()` — added null guard with logout broadcast; (5) `SlotCard.tsx` imported `path` from Node.js (not available in sandboxed renderer) — replaced with browser-safe basename; (6) `eventsub.RedemptionEvent` lacked `userDisplayName`/`redeemedAt` fields required by queue — added both with correct Twitch event mapping.
+**Deviations:** None.
+
+**Reviews:** Skipped (audit task, code-reviewer subagent performed the audit).
+
+**Verification:**
+- `npm test` → 109 passed after all fixes
+
+---
+
 <!-- Entries are added by agents as tasks are completed.
 
 Format is strict — use only these sections, do not add others.

@@ -67,8 +67,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   onLogEntry: (cb: (entry: LogEntry) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, entry: LogEntry): void => cb(entry);
-    ipcRenderer.on('twitch:log', listener);
-    return (): void => { ipcRenderer.removeListener('twitch:log', listener); };
+    ipcRenderer.on('log:entry', listener);
+    return (): void => { ipcRenderer.removeListener('log:entry', listener); };
   },
 
   slotsList: (): Promise<Slot[]> => ipcRenderer.invoke('slots:list'),
