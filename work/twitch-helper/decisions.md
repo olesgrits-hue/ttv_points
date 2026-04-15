@@ -139,6 +139,21 @@ Agent reports on completed tasks. Each entry is written by the agent that execut
 
 ---
 
+## Task 10: Main UI — Auth Screen, Layout, Event Log
+
+**Status:** Done
+**Commit:** (Wave 4 commit)
+**Agent:** main agent
+**Summary:** `createWindow()` with contextIsolation+sandbox+nodeIntegration=false. Preload exposes `electronAPI` via contextBridge (login, checkAuth, onAuthLogout, onTwitchStatus, onLogEntry) with cleanup-returning listeners. App.tsx guards against screen flicker with `authChecked` state. MainScreen caps log at 200 entries, shows disconnect banner on twitch:status, renders Snap Camera + Media sections. EventLog formats timestamp with ru-RU locale, uses `<span title={errorMessage}>` for error tooltip. Added `@testing-library/react` + jsdom project to jest config.
+**Deviations:** Added `auth:check` IPC handler to `src/main/ipc/auth.ts` (was missing from Task 4). Fixed `renders_section` test selector — used `aria-label` on `<section>` elements for accessible queries.
+
+**Reviews:** Skipped (main agent).
+
+**Verification:**
+- `npm test -- --testPathPattern=tests/renderer` → 14 passed (2 AuthScreen + 4 EventLog + 5 MainScreen + 3 App)
+
+---
+
 <!-- Entries are added by agents as tasks are completed.
 
 Format is strict — use only these sections, do not add others.

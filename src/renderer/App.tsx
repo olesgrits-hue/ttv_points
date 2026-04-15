@@ -1,10 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { AuthScreen } from './screens/AuthScreen';
+import { MainScreen } from './screens/MainScreen';
+
+type Screen = 'auth' | 'main';
 
 export function App(): React.ReactElement {
-  return (
-    <div>
-      <h1>Twitch Helper</h1>
-      <p>Renderer initialized.</p>
-    </div>
-  );
+  const [screen, setScreen] = useState<Screen>('auth');
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    // Check if already authenticated on mount.
+    window.electronAPI
+      .checkAuth()
+      .then((isAuth) => {
+        if (isAuth) setScreen('main');
+      })
+      .catch(console.error)
+      .finally(() => setAuthChecked(true));
+
+    // Subscribe to logout event from main process.
+    const unsub = window.electronAPI.onAuthLogout(() => setScreen('auth'));
+    return unsub;
+  }, []);
+
+  if (!authChecked) {
+    // Brief loading state to prevent screen flicker.
+    return <div />;
+  }
+
+  return screen === 'auth' ? <AuthScreen /> : <MainScreen />;
 }
