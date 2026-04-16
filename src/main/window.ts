@@ -22,7 +22,7 @@ export function createWindow(): BrowserWindow {
   if (!app.isPackaged) {
     win.loadURL(VITE_DEV_URL).catch(console.error);
   } else {
-    win.loadFile(path.join(__dirname, '../renderer/index.html')).catch(console.error);
+    win.loadFile(path.join(__dirname, '../web/renderer/index.html')).catch(console.error);
   }
 
   return win;
