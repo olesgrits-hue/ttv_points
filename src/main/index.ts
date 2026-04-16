@@ -14,7 +14,7 @@ import { SlotService } from './slots/service';
 import { Queue } from './queue';
 import { MaskAction } from './actions/mask';
 import { MediaAction } from './actions/media';
-import { registerActionHandlers } from './queue/dispatcher';
+import { registerActionHandlers, type ExecuteFn } from './queue/dispatcher';
 import { registerAuthIpcHandlers, checkAuthOnStartup } from './ipc/auth';
 import { registerSnapIpcHandlers } from './ipc/snap';
 import { registerSlotIpcHandlers } from './ipc/slots';
@@ -23,7 +23,7 @@ import { registerSlotIpcHandlers } from './ipc/slots';
 
 const configStore = new ConfigStore({ isPackaged: app.isPackaged });
 const authStore = new AuthStore();
-const twitchAuth = new TwitchAuth(configStore, authStore);
+const twitchAuth = new TwitchAuth(authStore, configStore);
 const twitchApi = new TwitchApiClient(configStore, authStore, twitchAuth);
 const twitchClient = new TwitchClient(configStore, authStore, twitchAuth);
 const overlayServer = new OverlayServer();
@@ -35,8 +35,8 @@ const mediaAction = new MediaAction(overlayServer, twitchApi);
 
 // Register action handlers in dispatcher (avoids circular deps)
 registerActionHandlers(
-  maskAction.execute.bind(maskAction),
-  mediaAction.execute.bind(mediaAction),
+  maskAction.execute.bind(maskAction) as ExecuteFn,
+  mediaAction.execute.bind(mediaAction) as ExecuteFn,
 );
 
 // Queue wired to TwitchClient for pause/resume

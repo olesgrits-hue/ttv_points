@@ -163,7 +163,7 @@ export class EventSubClient extends EventEmitter {
         userLogin: ev.user_login,
         userDisplayName: ev.user_name,  // Twitch user_name IS the display name
         redemptionId: ev.id,
-        redeemedAt: (ev.redeemed_at as string | undefined) ?? new Date().toISOString(),
+        redeemedAt: ((ev as Record<string, unknown>)['redeemed_at'] as string | undefined) ?? new Date().toISOString(),
       };
       this.emit('redemption', redemption);
     }
@@ -172,7 +172,8 @@ export class EventSubClient extends EventEmitter {
   private async _subscribe(sessionId: string): Promise<void> {
     const cfg = this.configStore.read();
     const broadcasterId = cfg.broadcasterId ?? '';
-    const { accessToken } = await this.authStore.getTokens();
+    const tokens = await this.authStore.getTokens();
+    const accessToken = tokens?.accessToken ?? '';
     const clientId = process.env.TWITCH_CLIENT_ID ?? '';
 
     const res = await fetch(SUBSCRIPTION_API, {

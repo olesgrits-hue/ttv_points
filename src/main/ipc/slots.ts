@@ -42,19 +42,20 @@ function validateSlotPayload(payload: unknown): Omit<Slot, 'id'> {
   assertString(p['rewardTitle'], 'rewardTitle');
 
   const type = p['type'] as 'mask' | 'media' | 'meme';
+  const base = { enabled: p['enabled'] as boolean, rewardId: p['rewardId'] as string, rewardTitle: p['rewardTitle'] as string };
   if (type === 'mask') {
     assertString(p['lensId'], 'lensId');
     assertString(p['lensName'], 'lensName');
     assertString(p['hotkey'], 'hotkey');
-    return { type, enabled: p['enabled'] as boolean, rewardId: p['rewardId'] as string, rewardTitle: p['rewardTitle'] as string, lensId: p['lensId'] as string, lensName: p['lensName'] as string, hotkey: p['hotkey'] as string };
+    return { ...base, type, lensId: p['lensId'] as string, lensName: p['lensName'] as string, hotkey: p['hotkey'] as string } as Omit<Slot, 'id'>;
   }
   if (type === 'media') {
     assertString(p['filePath'], 'filePath');
-    return { type, enabled: p['enabled'] as boolean, rewardId: p['rewardId'] as string, rewardTitle: p['rewardTitle'] as string, filePath: p['filePath'] as string };
+    return { ...base, type, filePath: p['filePath'] as string } as Omit<Slot, 'id'>;
   }
   // meme
   assertString(p['folderPath'], 'folderPath');
-  return { type, enabled: p['enabled'] as boolean, rewardId: p['rewardId'] as string, rewardTitle: p['rewardTitle'] as string, folderPath: p['folderPath'] as string };
+  return { ...base, type, folderPath: p['folderPath'] as string } as Omit<Slot, 'id'>;
 }
 
 export function registerSlotIpcHandlers(

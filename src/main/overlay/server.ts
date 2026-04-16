@@ -175,7 +175,7 @@ export class OverlayServer {
     });
 
     this.app.get('/media/:id', (req: Request, res: Response) => {
-      const id = req.params.id;
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       // Reject ids with path separators or traversal markers as defense in depth.
       if (!id || /[\\/]|\.\./.test(id)) {
         res.status(400).end();

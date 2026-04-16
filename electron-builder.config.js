@@ -30,6 +30,8 @@ module.exports = {
       },
     ],
     artifactName: 'twitch-helper.exe',
+    sign: false,
+    certificateSubjectName: undefined,
   },
   portable: {
     artifactName: 'twitch-helper.exe',

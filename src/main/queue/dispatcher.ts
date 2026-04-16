@@ -8,7 +8,7 @@ import { RedemptionEvent } from './types';
 
 // Lazy imports of action handlers — implemented in Tasks 8 and 9.
 // Imported lazily to avoid circular deps during task-by-task implementation.
-type ExecuteFn = (slot: Slot, redemption: RedemptionEvent) => Promise<void>;
+export type ExecuteFn = (slot: Slot, redemption: RedemptionEvent) => Promise<void>;
 
 let _maskExecute: ExecuteFn | null = null;
 let _mediaExecute: ExecuteFn | null = null;
