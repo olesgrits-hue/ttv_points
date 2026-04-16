@@ -8,6 +8,8 @@ const TWITCH_AUTH_BASE = 'https://id.twitch.tv/oauth2';
 const TWITCH_API_BASE = 'https://api.twitch.tv/helix';
 const SCOPES = 'channel:read:redemptions channel:manage:redemptions';
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1_000; // 5 minutes
+const OAUTH_CALLBACK_PORT = 7892;
+const OAUTH_REDIRECT_URI = `http://localhost:${OAUTH_CALLBACK_PORT}/callback`;
 
 export interface Tokens {
   accessToken: string;
@@ -65,14 +67,14 @@ export class TwitchAuth {
     const { code_verifier, code_challenge } = generatePkce();
     const state = randomBytes(16).toString('hex');
 
-    const { port, code } = await this._waitForCallback(
+    const { code } = await this._waitForCallback(
       code_verifier,
       code_challenge,
       state,
     );
 
-    const tokens = await this._exchangeCode(code, port, code_verifier);
-    await this._saveTokens(tokens, port);
+    const tokens = await this._exchangeCode(code, code_verifier);
+    await this._saveTokens(tokens);
   }
 
   /**
@@ -120,7 +122,7 @@ export class TwitchAuth {
     code_verifier: string,
     code_challenge: string,
     state: string,
-  ): Promise<{ port: number; code: string }> {
+  ): Promise<{ code: string }> {
     return new Promise((resolve, reject) => {
       const server = http.createServer((req, res) => {
         const url = new URL(req.url ?? '/', `http://localhost`);
@@ -152,19 +154,14 @@ export class TwitchAuth {
           return;
         }
 
-        const addr = server.address();
-        const port = typeof addr === 'object' && addr ? addr.port : 0;
-        resolve({ port, code });
+        resolve({ code });
       });
 
-      server.listen(0, '127.0.0.1', () => {
-        const addr = server.address();
-        const port = typeof addr === 'object' && addr ? addr.port : 0;
-        const redirectUri = `http://localhost:${port}/callback`;
+      server.listen(OAUTH_CALLBACK_PORT, '127.0.0.1', () => {
 
         const authUrl = new URL(`${TWITCH_AUTH_BASE}/authorize`);
         authUrl.searchParams.set('client_id', this.clientId);
-        authUrl.searchParams.set('redirect_uri', redirectUri);
+        authUrl.searchParams.set('redirect_uri', OAUTH_REDIRECT_URI);
         authUrl.searchParams.set('response_type', 'code');
         authUrl.searchParams.set('scope', SCOPES);
         authUrl.searchParams.set('state', state);
@@ -181,8 +178,8 @@ export class TwitchAuth {
     });
   }
 
-  private async _exchangeCode(code: string, port: number, verifier: string): Promise<Tokens> {
-    const redirectUri = `http://localhost:${port}/callback`;
+  private async _exchangeCode(code: string, verifier: string): Promise<Tokens> {
+    const redirectUri = OAUTH_REDIRECT_URI;
     const res = await fetch(`${TWITCH_AUTH_BASE}/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -207,7 +204,7 @@ export class TwitchAuth {
     };
   }
 
-  private async _saveTokens(tokens: Tokens, port: number): Promise<void> {
+  private async _saveTokens(tokens: Tokens): Promise<void> {
     await this.authStore.saveTokens(tokens.accessToken, tokens.refreshToken);
 
     // Fetch user metadata.
@@ -232,6 +229,5 @@ export class TwitchAuth {
     }
 
     this.configStore.write(update);
-    void port; // used in redirect_uri already
   }
 }
