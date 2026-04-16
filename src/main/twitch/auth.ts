@@ -6,7 +6,6 @@ import { ConfigStore } from '../store/config';
 
 const TWITCH_AUTH_BASE = 'https://id.twitch.tv/oauth2';
 const TWITCH_API_BASE = 'https://api.twitch.tv/helix';
-const CLIENT_ID = process.env.TWITCH_CLIENT_ID ?? '';
 const SCOPES = 'channel:read:redemptions channel:manage:redemptions';
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1_000; // 5 minutes
 
@@ -45,6 +44,11 @@ export class TwitchAuth {
     private readonly configStore: ConfigStore,
   ) {}
 
+  /** Returns clientId from config.json, falling back to TWITCH_this.clientId env var. */
+  private get clientId(): string {
+    return this.configStore.read().clientId ?? process.env.TWITCH_CLIENT_ID ?? '';
+  }
+
   /**
    * Start login: spin up a local callback server on an OS-assigned port,
    * open the browser at the Twitch auth URL, then wait for the code.
@@ -80,7 +84,7 @@ export class TwitchAuth {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: CLIENT_ID,
+        client_id: this.clientId,
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
       }).toString(),
@@ -159,7 +163,7 @@ export class TwitchAuth {
         const redirectUri = `http://localhost:${port}/callback`;
 
         const authUrl = new URL(`${TWITCH_AUTH_BASE}/authorize`);
-        authUrl.searchParams.set('client_id', CLIENT_ID);
+        authUrl.searchParams.set('client_id', this.clientId);
         authUrl.searchParams.set('redirect_uri', redirectUri);
         authUrl.searchParams.set('response_type', 'code');
         authUrl.searchParams.set('scope', SCOPES);
@@ -183,7 +187,7 @@ export class TwitchAuth {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: CLIENT_ID,
+        client_id: this.clientId,
         code,
         code_verifier: verifier,
         grant_type: 'authorization_code',
@@ -210,7 +214,7 @@ export class TwitchAuth {
     const userRes = await fetch(`${TWITCH_API_BASE}/users`, {
       headers: {
         Authorization: `Bearer ${tokens.accessToken}`,
-        'Client-Id': CLIENT_ID,
+        'Client-Id': this.clientId,
       },
     });
 

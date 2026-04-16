@@ -140,7 +140,7 @@ export class TwitchApiClient {
     }
     const { accessToken } = tokens;
     const cfg = this.configStore.read();
-    const clientId = process.env.TWITCH_CLIENT_ID ?? '';
+    const clientId = cfg.clientId ?? process.env.TWITCH_CLIENT_ID ?? '';
 
     const headers = {
       Authorization: `Bearer ${accessToken}`,

@@ -31,6 +31,7 @@ export type Slot = MaskSlot | MediaSlot | MemeSlot;
 export interface Config {
   slots: Slot[];
   removeMaskHotkey: string;
+  clientId?: string;        // Twitch application Client ID
   userId?: string;
   broadcasterId?: string;
   tokenExpiresAt?: string; // ISO 8601

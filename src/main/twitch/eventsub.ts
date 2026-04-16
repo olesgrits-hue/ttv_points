@@ -174,7 +174,7 @@ export class EventSubClient extends EventEmitter {
     const broadcasterId = cfg.broadcasterId ?? '';
     const tokens = await this.authStore.getTokens();
     const accessToken = tokens?.accessToken ?? '';
-    const clientId = process.env.TWITCH_CLIENT_ID ?? '';
+    const clientId = cfg.clientId ?? process.env.TWITCH_CLIENT_ID ?? '';
 
     const res = await fetch(SUBSCRIPTION_API, {
       method: 'POST',
