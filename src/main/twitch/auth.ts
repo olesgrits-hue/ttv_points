@@ -1,7 +1,6 @@
 import * as http from 'http';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { shell } from 'electron';
-import pkceChallenge from 'pkce-challenge';
 import { AuthStore } from '../store/auth';
 import { ConfigStore } from '../store/config';
 
@@ -28,9 +27,17 @@ interface TwitchUser {
   login: string;
 }
 
+/** Generate PKCE verifier + S256 challenge using built-in crypto. */
+function generatePkce(): { code_verifier: string; code_challenge: string } {
+  const code_verifier = randomBytes(32).toString('base64url');
+  const code_challenge = createHash('sha256')
+    .update(code_verifier)
+    .digest('base64url');
+  return { code_verifier, code_challenge };
+}
+
 /**
  * TwitchAuth handles OAuth 2.0 Authorization Code + PKCE flow.
- * Uses pkce-challenge for verifier/challenge generation.
  */
 export class TwitchAuth {
   constructor(
@@ -51,7 +58,7 @@ export class TwitchAuth {
       return;
     }
 
-    const { code_verifier, code_challenge } = await pkceChallenge();
+    const { code_verifier, code_challenge } = generatePkce();
     const state = randomBytes(16).toString('hex');
 
     const { port, code } = await this._waitForCallback(
