@@ -20,8 +20,8 @@ module.exports = {
   asar: true,
 
   asarUnpack: [
-    'node_modules/robotjs/**/*',
     'node_modules/keytar/**/*',
+    'node_modules/robotjs/**/*',
   ],
   win: {
     target: [
