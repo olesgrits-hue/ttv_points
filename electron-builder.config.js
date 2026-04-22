@@ -21,7 +21,6 @@ module.exports = {
 
   asarUnpack: [
     'node_modules/keytar/**/*',
-    'node_modules/robotjs/**/*',
   ],
   win: {
     target: [
