@@ -1,16 +1,24 @@
+<div align="center">
+
 # ttv_points
 
-> Портативный оверлей для OBS: зрители активируют Channel Points — на стриме появляются видео, мемы и музыка из Яндекс Музыки.
+**Портативный оверлей для OBS: зрители тратят Channel Points — на стриме появляются видео, мемы и музыка из Яндекс Музыки.**
 
-[![Release](https://github.com/olesgrits-hue/ttv_points/actions/workflows/release.yml/badge.svg)](https://github.com/olesgrits-hue/ttv_points/actions/workflows/release.yml)
-[![GitHub release](https://img.shields.io/github/v/release/olesgrits-hue/ttv_points)](https://github.com/olesgrits-hue/ttv_points/releases/latest)
-[![Platform](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/olesgrits-hue/ttv_points/releases/latest)
+[![CI](https://github.com/olesgrits-hue/ttv_points/actions/workflows/release.yml/badge.svg)](https://github.com/olesgrits-hue/ttv_points/actions/workflows/release.yml)
+[![GitHub release](https://img.shields.io/github/v/release/olesgrits-hue/ttv_points?label=последний%20релиз)](https://github.com/olesgrits-hue/ttv_points/releases/latest)
+[![Platform](https://img.shields.io/badge/платформа-Windows%2010%2F11-blue)](https://github.com/olesgrits-hue/ttv_points/releases/latest)
+
+<br/>
+
+[**⬇ Скачать twitch-helper.exe**](https://github.com/olesgrits-hue/ttv_points/releases/latest)
+
+</div>
 
 ---
 
 ## Что это
 
-Приложение для стримеров на Twitch. Зритель тратит Channel Points — на стриме в OBS воспроизводится медиафайл, случайный мем или трек из Яндекс Музыки с анимацией.
+Приложение для стримеров на Twitch. Зритель тратит Channel Points → на стриме в OBS воспроизводится медиафайл, случайный мем или трек из Яндекс Музыки с анимацией виниловой пластинки.
 
 Работает как portable `.exe` — ничего устанавливать не нужно.
 
@@ -22,59 +30,57 @@
 |-----------|----------------|
 | **Медиафайл** | Воспроизводит выбранное видео или GIF поверх стрима |
 | **Мем** | Берёт случайный файл из указанной папки |
-| **Яндекс Музыка** | Зритель пишет название трека или ссылку — музыка играет с анимацией виниловой пластинки |
+| **Яндекс Музыка** | Зритель пишет название — музыка играет с анимацией пластинки |
 
-Дополнительно:
-- **Группы оверлеев** — разные Browser Source для разных типов контента
+- **Группы оверлеев** — несколько независимых Browser Source для разных типов контента
 - **Очередь** — события обрабатываются по одному, без наложений
 - **Лог событий** — все активации с результатом в реальном времени
-
----
-
-## Установка
-
-1. Скачай `twitch-helper.exe` со страницы [Releases](https://github.com/olesgrits-hue/ttv_points/releases/latest)
-2. Положи файл в любую папку
-3. Запусти — установка не нужна
+- **Баг-репорт** — одна кнопка открывает GitHub Issues с предзаполненными логами
 
 ---
 
 ## Быстрый старт
 
-### 1. Авторизация в Twitch
-При первом запуске нажми **"Войти через Twitch"** — откроется браузер, войди в аккаунт стримера.
+### 1. Скачай и запусти
 
-### 2. OBS Browser Source
-Добавь новый источник **Browser Source** с адресом:
+Скачай `twitch-helper.exe` со страницы [Releases](https://github.com/olesgrits-hue/ttv_points/releases/latest), положи в любую папку, запусти.
+
+### 2. Авторизуйся в Twitch
+
+При первом запуске нажми **"Войти через Twitch"** — откроется браузер. Войди в аккаунт стримера.
+
+### 3. Добавь Browser Source в OBS
+
 ```
 http://127.0.0.1:7891/overlay/default
 ```
+
 Рекомендуемые настройки: **1920 × 1080**, отключи "Shutdown source when not visible".
 
-### 3. Создай слот
-В приложении перейди на вкладку **СЛОТЫ** → **"+ добавить слот"**:
-- выбери тип (медиафайл / мем / музыка)
-- привяжи существующий Channel Points reward или создай новый прямо из приложения
+### 4. Создай слот
 
-### 4. Яндекс Музыка (опционально)
-Вкладка **НАСТРОЙКИ** → **"Войти через Яндекс"** — откроется браузер с кодом, введи его на `ya.ru/device`.
+Вкладка **СЛОТЫ** → **"+ добавить слот"** → выбери тип → привяжи Channel Points reward.
+
+### 5. Яндекс Музыка (опционально)
+
+Вкладка **НАСТРОЙКИ** → **"Войти через Яндекс"** → введи код на `ya.ru/device`.
 
 ---
 
-## Использование групп
+## Несколько оверлеев (группы)
 
-Если нужно несколько независимых оверлеев (например, отдельный для музыки):
+Если нужны отдельные Browser Source для разных типов контента:
 
 1. Создай группу в разделе **СЛОТЫ**
 2. Назначь слоты в эту группу
-3. Добавь второй Browser Source с адресом `http://127.0.0.1:7891/overlay/{название-группы}`
+3. Добавь второй источник: `http://127.0.0.1:7891/overlay/{название-группы}`
 
 ---
 
 ## Требования
 
 - Windows 10/11 x64
-- Активный Twitch-аккаунт с правами на Channel Points
+- Twitch-аккаунт с правами на Channel Points
 - OBS Studio (или любой браузерный источник)
 
 ---
@@ -89,6 +95,7 @@ npm run dev
 ```
 
 Сборка portable `.exe`:
+
 ```bash
 npm run build
 # → release/twitch-helper.exe
@@ -98,10 +105,14 @@ npm run build
 
 ## Поддержка
 
-Нашёл баг? Вкладка **ЛОГИ** → **"Открыть GitHub Issues"** — автоматически создаст репорт с логами.
+Нашёл баг? Вкладка **ЛОГИ** → **"Отправить баг-репорт"** — автоматически создаст issue с логами.
 
-Или вручную: [github.com/olesgrits-hue/ttv_points/issues](https://github.com/olesgrits-hue/ttv_points/issues)
+Или вручную: [Issues](https://github.com/olesgrits-hue/ttv_points/issues)
 
 ---
 
-Сделано для [twitch.tv/scler0ze](https://twitch.tv/scler0ze) · [Поддержать стримера](https://dalink.to/scler0se)
+<div align="center">
+
+Сделано для [twitch.tv/scler0ze](https://twitch.tv/scler0ze) &nbsp;·&nbsp; [Поддержать стримера](https://dalink.to/scler0se)
+
+</div>
