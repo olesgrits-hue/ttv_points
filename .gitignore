@@ -8,6 +8,7 @@ credentials.json
 secrets/
 config.json
 auth.json
+src/main/twitch/twitch-creds.ts
 .secrets/
 *api-key*
 *apikey*

@@ -3,6 +3,7 @@ import { randomBytes, createHash } from 'crypto';
 import { shell } from 'electron';
 import { AuthStore } from '../store/auth';
 import { ConfigStore } from '../store/config';
+import { TWITCH_CLIENT_ID as BUNDLED_CLIENT_ID, TWITCH_CLIENT_SECRET as BUNDLED_CLIENT_SECRET } from './twitch-creds';
 
 const TWITCH_AUTH_BASE = 'https://id.twitch.tv/oauth2';
 const TWITCH_API_BASE = 'https://api.twitch.tv/helix';
@@ -46,14 +47,12 @@ export class TwitchAuth {
     private readonly configStore: ConfigStore,
   ) {}
 
-  /** Returns clientId from config.json, falling back to TWITCH_CLIENT_ID env var. */
   private get clientId(): string {
-    return this.configStore.read().clientId ?? process.env.TWITCH_CLIENT_ID ?? '';
+    return this.configStore.read().clientId ?? process.env.TWITCH_CLIENT_ID ?? BUNDLED_CLIENT_ID;
   }
 
-  /** Returns clientSecret from config.json, falling back to TWITCH_CLIENT_SECRET env var. */
   private get clientSecret(): string {
-    return this.configStore.read().clientSecret ?? process.env.TWITCH_CLIENT_SECRET ?? '';
+    return this.configStore.read().clientSecret ?? process.env.TWITCH_CLIENT_SECRET ?? BUNDLED_CLIENT_SECRET;
   }
 
   /**
