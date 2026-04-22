@@ -2,7 +2,7 @@ import { v4 as uuid } from 'uuid';
 import { BrowserWindow } from 'electron';
 import { ConfigStore } from '../store/config';
 import { TwitchApiClient } from '../twitch/api';
-import { MaskSlot, Slot } from '../store/types';
+import { Slot } from '../store/types';
 import { LogEntry } from '../store/types';
 import { RedemptionEvent } from './types';
 
@@ -10,16 +10,16 @@ import { RedemptionEvent } from './types';
 // Imported lazily to avoid circular deps during task-by-task implementation.
 export type ExecuteFn = (slot: Slot, redemption: RedemptionEvent) => Promise<void>;
 
-let _maskExecute: ExecuteFn | null = null;
 let _mediaExecute: ExecuteFn | null = null;
+let _musicExecute: ExecuteFn | null = null;
 
 /** Register action handlers (called during bootstrap in main/index.ts). */
 export function registerActionHandlers(
-  maskExecute: ExecuteFn,
   mediaExecute: ExecuteFn,
+  musicExecute: ExecuteFn,
 ): void {
-  _maskExecute = maskExecute;
   _mediaExecute = mediaExecute;
+  _musicExecute = musicExecute;
 }
 
 /**
@@ -56,15 +56,11 @@ export class Dispatcher {
     }
 
     try {
-      if (slot.type === 'mask') {
-        if (!_maskExecute) {
-          throw new Error('MaskAction handler not registered');
-        }
-        await _maskExecute(slot, redemption);
+      if (slot.type === 'music') {
+        if (!_musicExecute) throw new Error('MusicAction handler not registered');
+        await _musicExecute(slot, redemption);
       } else {
-        if (!_mediaExecute) {
-          throw new Error('MediaAction handler not registered');
-        }
+        if (!_mediaExecute) throw new Error('MediaAction handler not registered');
         await _mediaExecute(slot, redemption);
       }
     } catch (err) {
@@ -108,5 +104,3 @@ function _broadcastLog(entry: LogEntry): void {
   }
 }
 
-// Suppress unused MaskSlot import warning — used in type checking above.
-void (null as unknown as MaskSlot);

@@ -1,96 +1,250 @@
 /**
  * Overlay player — runs in OBS Browser Source (Chromium renderer).
- *
- * Connects to the WS server at ws://127.0.0.1:7891/ws, authenticates with
- * the nonce embedded in the page URL, and handles `play` commands by
- * creating a <video> element at a random position/rotation within the viewport.
+ * Connects to ws://127.0.0.1:7891/ws, registers with __GROUP_ID__,
+ * handles 'play' and 'play_music' commands.
  */
 
 const WS_URL = 'ws://127.0.0.1:7891/ws';
-const VIDEO_WIDTH = 400;
-const VIDEO_HEIGHT = 300;
+const BASE_LONG_SIDE = 400;
+const MEME_PADDING = 15;
+const MEME_BORDER_RADIUS = 12;
 const MAX_ROTATION_DEG = 15;
 
-function getNonce(): string {
+function getGroupId(): string {
+  const w = window as Window & { __GROUP_ID__?: string };
+  if (w.__GROUP_ID__) return w.__GROUP_ID__;
   const params = new URLSearchParams(window.location.search);
-  return params.get('nonce') ?? '';
+  return params.get('groupId') ?? 'default';
 }
 
 function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function createVideoElement(url: string): HTMLVideoElement {
-  const x = randomBetween(0, Math.max(0, window.innerWidth - VIDEO_WIDTH));
-  const y = randomBetween(0, Math.max(0, window.innerHeight - VIDEO_HEIGHT));
+function createMediaElement(url: string, scale: number, isMeme: boolean): HTMLElement {
   const deg = randomBetween(-MAX_ROTATION_DEG, MAX_ROTATION_DEG);
 
   const video = document.createElement('video');
   video.src = url;
-  video.width = VIDEO_WIDTH;
-  video.height = VIDEO_HEIGHT;
   video.autoplay = true;
   video.muted = false;
-  video.style.position = 'absolute';
-  video.style.left = `${x}px`;
-  video.style.top = `${y}px`;
-  video.style.width = `${VIDEO_WIDTH}px`;
-  video.style.height = `${VIDEO_HEIGHT}px`;
-  video.style.transform = `rotate(${deg}deg)`;
+  video.style.display = 'block';
   video.style.pointerEvents = 'none';
-  return video;
+
+  let container: HTMLElement;
+
+  if (isMeme) {
+    container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.background = 'white';
+    container.style.borderRadius = `${MEME_BORDER_RADIUS}px`;
+    container.style.transform = `rotate(${deg}deg)`;
+    container.style.pointerEvents = 'none';
+    container.style.visibility = 'hidden';
+
+    container.appendChild(video);
+
+    video.addEventListener('loadedmetadata', () => {
+      const longSide = BASE_LONG_SIDE * scale;
+      const ratio = video.videoWidth / video.videoHeight;
+      const vw = ratio >= 1 ? longSide : Math.round(longSide * ratio);
+      const vh = ratio >= 1 ? Math.round(longSide / ratio) : longSide;
+      video.style.width = `${vw}px`;
+      video.style.height = `${vh}px`;
+      container.style.padding = `${MEME_PADDING}px`;
+      const totalW = vw + MEME_PADDING * 2;
+      const totalH = vh + MEME_PADDING * 2;
+      const x = randomBetween(0, Math.max(0, window.innerWidth - totalW));
+      const y = randomBetween(0, Math.max(0, window.innerHeight - totalH));
+      container.style.left = `${x}px`;
+      container.style.top = `${y}px`;
+      container.style.visibility = 'visible';
+    }, { once: true });
+  } else {
+    video.style.position = 'absolute';
+    video.style.transform = `rotate(${deg}deg)`;
+    video.style.visibility = 'hidden';
+
+    video.addEventListener('loadedmetadata', () => {
+      const longSide = BASE_LONG_SIDE * scale;
+      const ratio = video.videoWidth / video.videoHeight;
+      const vw = ratio >= 1 ? longSide : Math.round(longSide * ratio);
+      const vh = ratio >= 1 ? Math.round(longSide / ratio) : longSide;
+      video.style.width = `${vw}px`;
+      video.style.height = `${vh}px`;
+      const x = randomBetween(0, Math.max(0, window.innerWidth - vw));
+      const y = randomBetween(0, Math.max(0, window.innerHeight - vh));
+      video.style.left = `${x}px`;
+      video.style.top = `${y}px`;
+      video.style.visibility = 'visible';
+    }, { once: true });
+
+    container = video;
+  }
+
+  return container;
+}
+
+function createMusicPlayer(url: string, title: string, artist: string, coverUrl: string, scale: number): { element: HTMLElement; audio: HTMLAudioElement } {
+  const s = scale;
+  const discSize = Math.round(64 * s);
+  const pad = Math.round(12 * s);
+  const padH = Math.round(20 * s);
+  const gap = Math.round(16 * s);
+  const radius = Math.round(16 * s);
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `
+    position: absolute;
+    bottom: ${Math.round(40 * s)}px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    display: flex;
+    align-items: center;
+    gap: ${gap}px;
+    background: rgba(0,0,0,0.75);
+    border-radius: ${radius}px;
+    padding: ${pad}px ${padH}px;
+    min-width: ${Math.round(320 * s)}px;
+    max-width: ${Math.round(600 * s)}px;
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+  `;
+
+  const disc = document.createElement('div');
+  disc.style.cssText = `
+    width: ${discSize}px;
+    height: ${discSize}px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    animation: vinyl-spin 20s linear infinite;
+    background: #333;
+  `;
+
+  if (coverUrl) {
+    const img = document.createElement('img');
+    img.src = coverUrl;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+    disc.appendChild(img);
+  }
+
+  const info = document.createElement('div');
+  info.style.cssText = 'color:#fff;overflow:hidden;flex:1;min-width:0;';
+
+  const titleEl = document.createElement('div');
+  titleEl.style.cssText = `font-size:${Math.round(22 * s)}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
+  titleEl.textContent = title;
+
+  const artistEl = document.createElement('div');
+  artistEl.style.cssText = `font-size:${Math.round(18 * s)}px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:${Math.round(4 * s)}px;`;
+  artistEl.textContent = artist;
+
+  info.appendChild(titleEl);
+  info.appendChild(artistEl);
+  wrap.appendChild(disc);
+  wrap.appendChild(info);
+
+  const audio = document.createElement('audio');
+  audio.src = url;
+  audio.autoplay = true;
+  wrap.appendChild(audio);
+
+  if (!document.getElementById('vinyl-spin-style')) {
+    const style = document.createElement('style');
+    style.id = 'vinyl-spin-style';
+    style.textContent = '@keyframes vinyl-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+  }
+
+  (wrap as HTMLElement & { _stopEq: () => void })._stopEq = () => {};
+
+  return { element: wrap, audio };
 }
 
 interface PlayMessage {
   type: 'play';
   id?: string;
   url: string;
+  scale?: number;
+  isMeme?: boolean;
 }
 
-interface AuthMessage {
-  type: 'auth';
-  nonce: string;
+interface PlayMusicMessage {
+  type: 'play_music';
+  url: string;
+  title: string;
+  artist: string;
+  coverUrl: string;
+  duration: number;
+  scale?: number;
 }
 
 function connect(): void {
-  const nonce = getNonce();
+  const groupId = getGroupId();
   const ws = new WebSocket(WS_URL);
 
   ws.addEventListener('open', () => {
-    const msg: AuthMessage = { type: 'auth', nonce };
-    ws.send(JSON.stringify(msg));
+    ws.send(JSON.stringify({ type: 'register', groupId }));
   });
 
   ws.addEventListener('message', (event: MessageEvent) => {
-    let msg: PlayMessage;
+    let msg: PlayMessage | PlayMusicMessage;
     try {
-      msg = JSON.parse(event.data as string) as PlayMessage;
+      msg = JSON.parse(event.data as string) as PlayMessage | PlayMusicMessage;
     } catch {
       return;
     }
 
-    if (msg.type !== 'play' || !msg.url) return;
+    if (msg.type === 'play') {
+      const { url, scale = 3, isMeme = false, id } = msg as PlayMessage;
+      if (!url) return;
+      const element = createMediaElement(url, scale, isMeme);
+      document.body.appendChild(element);
+      const video = element instanceof HTMLVideoElement ? element : element.querySelector('video')!;
+      const cleanup = (): void => {
+        element.remove();
+        ws.send(JSON.stringify({ type: 'playback_ended', id }));
+      };
+      video.addEventListener('ended', cleanup, { once: true });
+      video.addEventListener('error', cleanup, { once: true });
+      return;
+    }
 
-    const video = createVideoElement(msg.url);
-    document.body.appendChild(video);
+    if (msg.type === 'play_music') {
+      const { url, title, artist, coverUrl, duration, scale = 1 } = msg as PlayMusicMessage;
+      const { element, audio } = createMusicPlayer(url, title, artist, coverUrl, scale);
+      document.body.appendChild(element);
 
-    const cleanup = (): void => {
-      video.remove();
-      ws.send(JSON.stringify({ type: 'playback_ended' }));
-    };
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          (element as HTMLElement).style.transform = 'translateX(-50%) translateY(0)';
+        });
+      });
 
-    video.addEventListener('ended', cleanup, { once: true });
-    video.addEventListener('error', cleanup, { once: true });
+      let finished = false;
+      const finish = (): void => {
+        if (finished) return;
+        finished = true;
+        (element as (HTMLElement & { _stopEq?: () => void }))._stopEq?.();
+        (element as HTMLElement).style.transform = 'translateX(-50%) translateY(120%)';
+        setTimeout(() => {
+          element.remove();
+          ws.send(JSON.stringify({ type: 'playback_ended' }));
+        }, 500);
+      };
+
+      audio.addEventListener('ended', finish, { once: true });
+      audio.addEventListener('error', finish, { once: true });
+      setTimeout(finish, (duration + 10) * 1000);
+    }
   });
 
   ws.addEventListener('close', () => {
-    // Reconnect after a brief delay so overlay recovers if the main process restarts.
     setTimeout(connect, 3_000);
   });
 
-  ws.addEventListener('error', () => {
-    // Error fires before close — let the close handler do the reconnect.
-  });
+  ws.addEventListener('error', () => { /* handled by close */ });
 }
 
 connect();

@@ -3,6 +3,7 @@ import { Config } from './types';
 export const KEYTAR_SERVICE = 'twitch-helper';
 export const KEYTAR_ACCOUNT_ACCESS = 'access_token';
 export const KEYTAR_ACCOUNT_REFRESH = 'refresh_token';
+export const KEYTAR_ACCOUNT_YAM = 'yandex_token';
 export const DEV_ENV_VAR = 'TWITCH_HELPER_ACCESS_TOKEN';
 
 export interface Tokens {
@@ -83,6 +84,27 @@ export class AuthStore {
     }
 
     return null;
+  }
+
+  async saveYamToken(token: string): Promise<void> {
+    if (!this.keytar) throw new Error('keytar unavailable — cannot persist Yandex token');
+    await this.keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_YAM, token);
+  }
+
+  async getYamToken(): Promise<string | null> {
+    if (!this.keytar) return null;
+    try {
+      return await this.keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_YAM);
+    } catch {
+      return null;
+    }
+  }
+
+  async deleteYamToken(): Promise<void> {
+    if (!this.keytar) return;
+    try {
+      await this.keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_YAM);
+    } catch { /* best-effort */ }
   }
 
   async deleteTokens(): Promise<void> {

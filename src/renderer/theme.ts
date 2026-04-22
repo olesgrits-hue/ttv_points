@@ -1,0 +1,17 @@
+export const T = {
+  bg: '#0d0d0d',
+  surface: '#141414',
+  surfaceHover: '#1c1c1c',
+  border: '#2a2a2a',
+  borderBright: '#3a3a3a',
+  accent: '#00c896',
+  accentDim: '#007a5c',
+  text: '#e0e0e0',
+  textSoft: '#999',
+  textMuted: '#555',
+  error: '#ff4444',
+  warning: '#f5a623',
+  success: '#00c896',
+  purple: '#9147ff',
+  font: "'Courier New', Consolas, monospace",
+} as const;

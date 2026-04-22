@@ -8,7 +8,7 @@ module.exports = {
   appId: 'dev.twitchhelper.app',
   productName: 'Twitch Helper',
   directories: {
-    output: 'dist',
+    output: 'release',
     buildResources: 'build',
   },
   files: [
@@ -18,6 +18,7 @@ module.exports = {
     '!node_modules/**/{test,tests,__tests__,*.md,*.markdown,*.map}',
   ],
   asar: true,
+
   asarUnpack: [
     'node_modules/robotjs/**/*',
     'node_modules/keytar/**/*',

@@ -9,7 +9,7 @@ export interface LogEntry {
   errorMessage?: string;
 }
 
-export type SlotType = 'mask' | 'media' | 'meme';
+export type SlotType = 'media' | 'meme' | 'music';
 
 export interface BaseSlot {
   id: string;
@@ -17,15 +17,16 @@ export interface BaseSlot {
   enabled: boolean;
   rewardId: string;
   rewardTitle: string;
+  groupId?: string;
 }
 
-export interface MaskSlot extends BaseSlot { type: 'mask'; lensId: string; lensName: string; hotkey: string; }
-export interface MediaSlot extends BaseSlot { type: 'media'; filePath: string; }
-export interface MemeSlot extends BaseSlot { type: 'meme'; folderPath: string; }
-export type Slot = MaskSlot | MediaSlot | MemeSlot;
+export interface MediaSlot extends BaseSlot { type: 'media'; filePath: string; scale?: number; }
+export interface MemeSlot extends BaseSlot { type: 'meme'; folderPath: string; scale?: number; }
+export interface MusicSlot extends BaseSlot { type: 'music'; }
+export type Slot = MediaSlot | MemeSlot | MusicSlot;
 
 export interface RewardInfo { rewardId: string; rewardTitle: string; }
-export interface LensResult { lensId: string; lensName: string; }
+export interface SlotGroup { id: string; name: string; }
 
 export interface ElectronAPI {
   login: () => Promise<void>;
@@ -38,14 +39,25 @@ export interface ElectronAPI {
   slotsCreate: (payload: Omit<Slot, 'id'>) => Promise<Slot>;
   slotsDelete: (id: string) => Promise<void>;
   slotsToggle: (payload: { id: string; enabled: boolean }) => Promise<Slot>;
+  slotsSetScale: (payload: { id: string; scale: number }) => Promise<void>;
+  slotsSetGroup: (payload: { id: string; groupId: string | undefined }) => Promise<void>;
   // Rewards
   rewardsList: () => Promise<RewardInfo[]>;
   rewardsCreate: (payload: { name: string; cost: number; cooldownMinutes: number }) => Promise<RewardInfo>;
   // Dialogs
   dialogOpenFile: () => Promise<string | null>;
   dialogOpenFolder: () => Promise<string | null>;
-  // Snap
-  snapSearch: (payload: { query: string }) => Promise<LensResult[] | { error: string }>;
+  // Groups
+  groupsList: () => Promise<SlotGroup[]>;
+  groupsCreate: (name: string) => Promise<SlotGroup>;
+  groupsDelete: (id: string) => Promise<void>;
+  // Shell
+  shellOpenExternal: (url: string) => Promise<void>;
+  // Settings
+  settingsGetYamToken: () => Promise<string | undefined>;
+  settingsSetYamToken: (token: string) => Promise<void>;
+  settingsYamDeviceAuth: () => Promise<string>;
+  onYamDeviceProgress: (cb: (p: { verification_url: string; user_code: string }) => void) => () => void;
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -75,6 +87,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   slotsCreate: (payload: Omit<Slot, 'id'>): Promise<Slot> => ipcRenderer.invoke('slots:create', payload),
   slotsDelete: (id: string): Promise<void> => ipcRenderer.invoke('slots:delete', id),
   slotsToggle: (payload: { id: string; enabled: boolean }): Promise<Slot> => ipcRenderer.invoke('slots:toggle', payload),
+  slotsSetScale: (payload: { id: string; scale: number }): Promise<void> => ipcRenderer.invoke('slots:setScale', payload),
+  slotsSetGroup: (payload: { id: string; groupId: string | undefined }): Promise<void> => ipcRenderer.invoke('slots:setGroup', payload),
 
   rewardsList: (): Promise<RewardInfo[]> => ipcRenderer.invoke('rewards:list'),
   rewardsCreate: (payload: { name: string; cost: number; cooldownMinutes: number }): Promise<RewardInfo> =>
@@ -83,6 +97,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dialogOpenFile: (): Promise<string | null> => ipcRenderer.invoke('dialog:openFile'),
   dialogOpenFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:openFolder'),
 
-  snapSearch: (payload: { query: string }): Promise<LensResult[] | { error: string }> =>
-    ipcRenderer.invoke('snap:search', payload.query),
+  shellOpenExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url),
+
+  groupsList: (): Promise<SlotGroup[]> => ipcRenderer.invoke('groups:list'),
+  groupsCreate: (name: string): Promise<SlotGroup> => ipcRenderer.invoke('groups:create', name),
+  groupsDelete: (id: string): Promise<void> => ipcRenderer.invoke('groups:delete', id),
+
+  settingsGetYamToken: (): Promise<string | undefined> => ipcRenderer.invoke('settings:getYamToken'),
+  settingsSetYamToken: (token: string): Promise<void> => ipcRenderer.invoke('settings:setYamToken', token),
+  settingsYamDeviceAuth: (): Promise<string> => ipcRenderer.invoke('settings:yamDeviceAuth'),
+  onYamDeviceProgress: (cb: (p: { verification_url: string; user_code: string }) => void): (() => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, p: { verification_url: string; user_code: string }): void => cb(p);
+    ipcRenderer.on('settings:yamDeviceProgress', listener);
+    return (): void => { ipcRenderer.removeListener('settings:yamDeviceProgress', listener); };
+  },
 } satisfies ElectronAPI);

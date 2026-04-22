@@ -50,6 +50,34 @@ export class SlotService {
     this.config.write({ ...cfg, slots: filtered });
   }
 
+  setSlotScale(id: string, scale: number): void {
+    const cfg = this.config.read();
+    let found = false;
+    const slots = cfg.slots.map((s) => {
+      if (s.id === id) {
+        found = true;
+        return { ...s, scale };
+      }
+      return s;
+    });
+    if (!found) throw new SlotNotFoundError(id);
+    this.config.write({ ...cfg, slots });
+  }
+
+  setSlotGroup(id: string, groupId: string | undefined): void {
+    const cfg = this.config.read();
+    let found = false;
+    const slots = cfg.slots.map((s) => {
+      if (s.id === id) {
+        found = true;
+        return { ...s, groupId };
+      }
+      return s;
+    });
+    if (!found) throw new SlotNotFoundError(id);
+    this.config.write({ ...cfg, slots });
+  }
+
   toggleSlot(id: string, enabled: boolean): void {
     const cfg = this.config.read();
     let found = false;

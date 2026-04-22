@@ -46,9 +46,14 @@ export class TwitchAuth {
     private readonly configStore: ConfigStore,
   ) {}
 
-  /** Returns clientId from config.json, falling back to TWITCH_this.clientId env var. */
+  /** Returns clientId from config.json, falling back to TWITCH_CLIENT_ID env var. */
   private get clientId(): string {
     return this.configStore.read().clientId ?? process.env.TWITCH_CLIENT_ID ?? '';
+  }
+
+  /** Returns clientSecret from config.json, falling back to TWITCH_CLIENT_SECRET env var. */
+  private get clientSecret(): string {
+    return this.configStore.read().clientSecret ?? process.env.TWITCH_CLIENT_SECRET ?? '';
   }
 
   /**
@@ -87,6 +92,7 @@ export class TwitchAuth {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         client_id: this.clientId,
+        client_secret: this.clientSecret,
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
       }).toString(),
@@ -185,6 +191,7 @@ export class TwitchAuth {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         client_id: this.clientId,
+        client_secret: this.clientSecret,
         code,
         code_verifier: verifier,
         grant_type: 'authorization_code',

@@ -12,12 +12,14 @@ import { TwitchClient } from './twitch/client';
 import { OverlayServer } from './overlay/server';
 import { SlotService } from './slots/service';
 import { Queue } from './queue';
-import { MaskAction } from './actions/mask';
 import { MediaAction } from './actions/media';
+import { MusicAction } from './actions/music';
 import { registerActionHandlers, type ExecuteFn } from './queue/dispatcher';
 import { registerAuthIpcHandlers, checkAuthOnStartup } from './ipc/auth';
-import { registerSnapIpcHandlers } from './ipc/snap';
 import { registerSlotIpcHandlers } from './ipc/slots';
+import { registerGroupIpcHandlers } from './ipc/groups';
+import { registerSettingsIpcHandlers } from './ipc/settings';
+import { GroupService } from './slots/group-service';
 
 // ---- Singletons (created exactly once) ----------------------------------------
 
@@ -28,15 +30,16 @@ const twitchApi = new TwitchApiClient(configStore, authStore, twitchAuth);
 const twitchClient = new TwitchClient(configStore, authStore, twitchAuth);
 const overlayServer = new OverlayServer();
 const slotService = new SlotService(configStore);
+const groupService = new GroupService(configStore);
 
 // Action handlers constructed with shared singletons
-const maskAction = new MaskAction(configStore, twitchApi);
 const mediaAction = new MediaAction(overlayServer, twitchApi);
+const musicAction = new MusicAction(authStore, overlayServer, twitchApi);
 
 // Register action handlers in dispatcher (avoids circular deps)
 registerActionHandlers(
-  maskAction.execute.bind(maskAction) as ExecuteFn,
   mediaAction.execute.bind(mediaAction) as ExecuteFn,
+  musicAction.execute.bind(musicAction) as ExecuteFn,
 );
 
 // Queue wired to TwitchClient for pause/resume
@@ -47,8 +50,9 @@ const queue = new Queue(configStore, twitchClient, twitchApi);
 app.whenReady().then(async () => {
   // Register all IPC handlers before creating the window
   registerAuthIpcHandlers(twitchAuth, authStore, configStore);
-  registerSnapIpcHandlers();
   registerSlotIpcHandlers(slotService, twitchApi);
+  registerGroupIpcHandlers(groupService);
+  registerSettingsIpcHandlers(authStore);
 
   const win = createWindow();
 

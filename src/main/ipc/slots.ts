@@ -1,10 +1,10 @@
-import { ipcMain, dialog } from 'electron';
+import { ipcMain, dialog, shell } from 'electron';
 import { randomUUID } from 'crypto';
 import { SlotService } from '../slots/service';
 import { TwitchApiClient } from '../twitch/api';
 import type { Slot } from '../store/types';
 
-const VALID_SLOT_TYPES = new Set(['mask', 'media', 'meme']);
+const VALID_SLOT_TYPES = new Set(['media', 'meme', 'music']);
 const MAX_STRING_LEN = 500;
 
 /** Throw if val is not a non-empty string within an acceptable length. */
@@ -41,21 +41,20 @@ function validateSlotPayload(payload: unknown): Omit<Slot, 'id'> {
   assertString(p['rewardId'], 'rewardId');
   assertString(p['rewardTitle'], 'rewardTitle');
 
-  const type = p['type'] as 'mask' | 'media' | 'meme';
+  const type = p['type'] as 'media' | 'meme' | 'music';
   const base = { enabled: p['enabled'] as boolean, rewardId: p['rewardId'] as string, rewardTitle: p['rewardTitle'] as string };
-  if (type === 'mask') {
-    assertString(p['lensId'], 'lensId');
-    assertString(p['lensName'], 'lensName');
-    assertString(p['hotkey'], 'hotkey');
-    return { ...base, type, lensId: p['lensId'] as string, lensName: p['lensName'] as string, hotkey: p['hotkey'] as string } as Omit<Slot, 'id'>;
+  if (type === 'music') {
+    return { ...base, type } as Omit<Slot, 'id'>;
   }
   if (type === 'media') {
     assertString(p['filePath'], 'filePath');
-    return { ...base, type, filePath: p['filePath'] as string } as Omit<Slot, 'id'>;
+    const scale = typeof p['scale'] === 'number' ? Math.min(5, Math.max(1, Math.round(p['scale']))) : 3;
+    return { ...base, type, filePath: p['filePath'] as string, scale } as Omit<Slot, 'id'>;
   }
   // meme
   assertString(p['folderPath'], 'folderPath');
-  return { ...base, type, folderPath: p['folderPath'] as string } as Omit<Slot, 'id'>;
+  const scale = typeof p['scale'] === 'number' ? Math.min(5, Math.max(1, Math.round(p['scale']))) : 3;
+  return { ...base, type, folderPath: p['folderPath'] as string, scale } as Omit<Slot, 'id'>;
 }
 
 export function registerSlotIpcHandlers(
@@ -89,6 +88,35 @@ export function registerSlotIpcHandlers(
     const updated = slots.find((s) => s.id === id);
     if (!updated) throw new Error(`Slot ${id} not found after toggle`);
     return updated;
+  });
+
+  ipcMain.handle('slots:setScale', (_event, raw: unknown) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error('IPC validation failed: expected {id, scale}');
+    }
+    const { id, scale } = raw as Record<string, unknown>;
+    assertString(id, 'id');
+    assertNumber(scale, 'scale');
+    slotService.setSlotScale(id, Math.min(5, Math.max(1, Math.round(scale as number))));
+  });
+
+  ipcMain.handle('slots:setGroup', (_event, raw: unknown) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error('IPC validation failed: expected {id, groupId}');
+    }
+    const { id, groupId } = raw as Record<string, unknown>;
+    assertString(id, 'id');
+    if (groupId !== undefined && groupId !== null && typeof groupId !== 'string') {
+      throw new Error('IPC validation failed: groupId must be a string or null');
+    }
+    slotService.setSlotGroup(id, groupId as string | undefined);
+  });
+
+  ipcMain.handle('shell:openExternal', (_event, url: unknown) => {
+    if (typeof url !== 'string' || !url.startsWith('https://')) {
+      throw new Error('Invalid URL');
+    }
+    return shell.openExternal(url);
   });
 
   ipcMain.handle('rewards:list', async () => {

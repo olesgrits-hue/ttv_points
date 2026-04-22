@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { LensSearch } from './LensSearch';
 import type { Slot } from '../../main/store/types';
+import { T } from '../theme';
 
 interface RewardInfo { rewardId: string; rewardTitle: string; }
 
-type SlotType = 'mask' | 'media' | 'meme';
+type SlotType = 'media' | 'meme' | 'music';
 type RewardMode = 'existing' | 'new';
 
 interface SlotFormProps {
@@ -12,22 +12,28 @@ interface SlotFormProps {
   onCreated: (slot: Slot) => void;
 }
 
+const labelStyle: React.CSSProperties = {
+  fontSize: '0.75em',
+  color: T.textSoft,
+  display: 'block',
+  marginBottom: '4px',
+  letterSpacing: '0.05em',
+};
+
+const sectionStyle: React.CSSProperties = {
+  marginBottom: '14px',
+};
+
 export function SlotForm({ onClose, onCreated }: SlotFormProps): React.ReactElement {
   const [slotType, setSlotType] = useState<SlotType | null>(null);
   const [rewardMode, setRewardMode] = useState<RewardMode>('existing');
   const [rewards, setRewards] = useState<RewardInfo[]>([]);
   const [selectedRewardId, setSelectedRewardId] = useState('');
-  // New reward fields
   const [newRewardName, setNewRewardName] = useState('');
   const [newRewardCost, setNewRewardCost] = useState('');
   const [newRewardCooldown, setNewRewardCooldown] = useState('');
-  // Type-specific fields
-  const [lensId, setLensId] = useState('');
-  const [lensName, setLensName] = useState('');
-  const [hotkey, setHotkey] = useState('');
   const [filePath, setFilePath] = useState('');
   const [folderPath, setFolderPath] = useState('');
-  // Error
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,12 +71,12 @@ export function SlotForm({ onClose, onCreated }: SlotFormProps): React.ReactElem
     }
 
     let payload: Omit<Slot, 'id'>;
-    if (slotType === 'mask') {
-      payload = { type: 'mask', enabled: true, rewardId, rewardTitle, lensId, lensName, hotkey };
-    } else if (slotType === 'media') {
+    if (slotType === 'media') {
       payload = { type: 'media', enabled: true, rewardId, rewardTitle, filePath };
-    } else {
+    } else if (slotType === 'meme') {
       payload = { type: 'meme', enabled: true, rewardId, rewardTitle, folderPath };
+    } else {
+      payload = { type: 'music', enabled: true, rewardId, rewardTitle };
     }
 
     try {
@@ -87,217 +93,128 @@ export function SlotForm({ onClose, onCreated }: SlotFormProps): React.ReactElem
     }
   };
 
+  const radioStyle = (active: boolean): React.CSSProperties => ({
+    padding: '4px 10px',
+    fontSize: '0.8em',
+    borderColor: active ? T.accent : T.border,
+    color: active ? T.accent : T.textSoft,
+    background: active ? `${T.accent}11` : T.surface,
+    cursor: 'pointer',
+  });
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.4)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 200,
-      }}
-    >
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: '6px',
-          padding: '24px',
-          minWidth: '360px',
-          maxWidth: '480px',
-          width: '100%',
-        }}
-      >
-        <h3 style={{ margin: '0 0 16px' }}>Добавить слот</h3>
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 200,
+    }}>
+      <div style={{
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        padding: '20px',
+        minWidth: '360px',
+        maxWidth: '460px',
+        width: '100%',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <span style={{ color: T.accent, fontSize: '0.8em', letterSpacing: '0.1em' }}>/ ДОБАВИТЬ СЛОТ</span>
+          <button onClick={onClose} style={{ padding: '2px 6px', fontSize: '0.75em' }}>✕</button>
+        </div>
 
         {/* Type picker */}
-        <fieldset style={{ border: 'none', padding: 0, marginBottom: '16px' }}>
-          <legend style={{ fontWeight: 'bold', marginBottom: '8px' }}>Тип слота</legend>
-          <label style={{ marginRight: '12px' }}>
-            <input
-              type="radio"
-              name="slotType"
-              value="mask"
-              checked={slotType === 'mask'}
-              onChange={() => setSlotType('mask')}
-            />{' '}
-            Маска
-          </label>
-          <label style={{ marginRight: '12px' }}>
-            <input
-              type="radio"
-              name="slotType"
-              value="media"
-              checked={slotType === 'media'}
-              onChange={() => setSlotType('media')}
-            />{' '}
-            Медиафайл
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="slotType"
-              value="meme"
-              checked={slotType === 'meme'}
-              onChange={() => setSlotType('meme')}
-            />{' '}
-            Рандомный мем
-          </label>
-        </fieldset>
+        <div style={sectionStyle}>
+          <span style={labelStyle}>ТИП СЛОТА</span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {(['media', 'meme', 'music'] as SlotType[]).map((t) => (
+              <button key={t} onClick={() => setSlotType(t)} style={radioStyle(slotType === t)}>
+                {t === 'media' ? 'МЕДИА' : t === 'meme' ? 'МЕМ' : 'МУЗЫКА'}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Reward selector */}
-        <fieldset style={{ border: 'none', padding: 0, marginBottom: '16px' }}>
-          <legend style={{ fontWeight: 'bold', marginBottom: '8px' }}>Награда Twitch</legend>
-          <label style={{ marginRight: '12px' }}>
-            <input
-              type="radio"
-              name="rewardMode"
-              value="existing"
-              checked={rewardMode === 'existing'}
-              onChange={() => setRewardMode('existing')}
-            />{' '}
-            Выбрать существующую
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="rewardMode"
-              value="new"
-              checked={rewardMode === 'new'}
-              onChange={() => setRewardMode('new')}
-            />{' '}
-            Создать новую
-          </label>
+        <div style={sectionStyle}>
+          <span style={labelStyle}>НАГРАДА TWITCH</span>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+            <button onClick={() => setRewardMode('existing')} style={radioStyle(rewardMode === 'existing')}>
+              Существующая
+            </button>
+            <button onClick={() => setRewardMode('new')} style={radioStyle(rewardMode === 'new')}>
+              Создать новую
+            </button>
+          </div>
 
           {rewardMode === 'existing' && (
-            <div style={{ marginTop: '8px' }}>
-              {rewards.length === 0 ? (
-                <div style={{ color: '#666', fontSize: '0.9em' }}>
-                  Нет доступных наград. Создайте новую.
-                </div>
-              ) : (
-                <select
-                  value={selectedRewardId}
-                  onChange={(e) => setSelectedRewardId(e.target.value)}
-                  style={{ width: '100%', padding: '4px' }}
-                >
-                  <option value="">— выберите награду —</option>
-                  {rewards.map((r) => (
-                    <option key={r.rewardId} value={r.rewardId}>
-                      {r.rewardTitle}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
+            rewards.length === 0 ? (
+              <div style={{ color: T.textMuted, fontSize: '0.85em' }}>Нет доступных наград. Создайте новую.</div>
+            ) : (
+              <select
+                value={selectedRewardId}
+                onChange={(e) => setSelectedRewardId(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="">— выберите награду —</option>
+                {rewards.map((r) => (
+                  <option key={r.rewardId} value={r.rewardId}>{r.rewardTitle}</option>
+                ))}
+              </select>
+            )
           )}
 
           {rewardMode === 'new' && (
-            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <input
-                type="text"
-                placeholder="название"
-                value={newRewardName}
-                onChange={(e) => setNewRewardName(e.target.value)}
-                style={{ padding: '4px' }}
-              />
-              <input
-                type="number"
-                placeholder="стоимость"
-                value={newRewardCost}
-                onChange={(e) => setNewRewardCost(e.target.value)}
-                style={{ padding: '4px' }}
-              />
-              <input
-                type="number"
-                placeholder="кулдаун"
-                value={newRewardCooldown}
-                onChange={(e) => setNewRewardCooldown(e.target.value)}
-                style={{ padding: '4px' }}
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <input type="text" placeholder="название" value={newRewardName} onChange={(e) => setNewRewardName(e.target.value)} style={{ width: '100%' }} />
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input type="number" placeholder="стоимость" value={newRewardCost} onChange={(e) => setNewRewardCost(e.target.value)} style={{ flex: 1 }} />
+                <input type="number" placeholder="кулдаун (мин)" value={newRewardCooldown} onChange={(e) => setNewRewardCooldown(e.target.value)} style={{ flex: 1 }} />
+              </div>
             </div>
           )}
-        </fieldset>
+        </div>
 
         {/* Type-specific fields */}
-        {slotType === 'mask' && (
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ marginBottom: '8px' }}>
-              <label style={{ display: 'block', marginBottom: '4px' }}>Линза</label>
-              <LensSearch
-                onSelect={(lens) => {
-                  setLensId(lens.lensId);
-                  setLensName(lens.lensName);
-                }}
-              />
-            </div>
-            <div style={{ marginBottom: '8px' }}>
-              <label style={{ display: 'block', marginBottom: '4px' }}>Hotkey</label>
-              <input
-                type="text"
-                placeholder="ctrl+shift+1"
-                value={hotkey}
-                onChange={(e) => setHotkey(e.target.value)}
-                style={{ width: '100%', padding: '4px' }}
-              />
-            </div>
-            <div
-              style={{
-                background: '#f5f5f5',
-                padding: '8px',
-                borderRadius: '4px',
-                fontSize: '0.82em',
-                color: '#555',
-              }}
-            >
-              Как назначить hotkey в Snap Camera: Settings → Hotkeys → выберите линзу
-            </div>
-          </div>
-        )}
-
         {slotType === 'media' && (
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '4px' }}>Файл</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                value={filePath}
-                onChange={(e) => setFilePath(e.target.value)}
-                placeholder="Путь к файлу"
-                style={{ flex: 1, padding: '4px' }}
-              />
-              <button onClick={browseFile}>Обзор...</button>
+          <div style={sectionStyle}>
+            <span style={labelStyle}>ФАЙЛ</span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input type="text" value={filePath} onChange={(e) => setFilePath(e.target.value)} placeholder="путь к файлу" style={{ flex: 1 }} />
+              <button onClick={browseFile}>Обзор</button>
             </div>
           </div>
         )}
 
         {slotType === 'meme' && (
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '4px' }}>Папка</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                value={folderPath}
-                onChange={(e) => setFolderPath(e.target.value)}
-                placeholder="Путь к папке"
-                style={{ flex: 1, padding: '4px' }}
-              />
-              <button onClick={browseFolder}>Обзор...</button>
+          <div style={sectionStyle}>
+            <span style={labelStyle}>ПАПКА</span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input type="text" value={folderPath} onChange={(e) => setFolderPath(e.target.value)} placeholder="путь к папке" style={{ flex: 1 }} />
+              <button onClick={browseFolder}>Обзор</button>
             </div>
           </div>
         )}
 
-        {error && (
-          <div style={{ color: '#c00', fontSize: '0.9em', marginBottom: '12px' }}>
-            {error}
+        {slotType === 'music' && (
+          <div style={{ ...sectionStyle, padding: '8px', background: T.bg, borderLeft: `2px solid ${T.accentDim}`, fontSize: '0.82em', color: T.textSoft }}>
+            Зритель вводит название трека или ссылку music.yandex.ru в сообщении к реварду.
           </div>
         )}
 
-        {/* Actions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        {error && (
+          <div style={{ color: T.error, fontSize: '0.85em', marginBottom: '12px' }}>{error}</div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
           <button onClick={onClose}>Отмена</button>
-          <button onClick={handleSave} disabled={slotType === null}>
+          <button
+            onClick={handleSave}
+            disabled={slotType === null}
+            style={{ borderColor: T.accent, color: T.accent }}
+          >
             Сохранить
           </button>
         </div>

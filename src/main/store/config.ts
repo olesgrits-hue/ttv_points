@@ -103,9 +103,9 @@ function cloneDefaults(): Config {
 function normalize(parsed: Partial<Config>): Config {
   return {
     slots: Array.isArray(parsed.slots) ? parsed.slots : [],
-    removeMaskHotkey:
-      typeof parsed.removeMaskHotkey === 'string' ? parsed.removeMaskHotkey : '',
+    groups: Array.isArray(parsed.groups) ? parsed.groups : [],
     clientId: typeof parsed.clientId === 'string' ? parsed.clientId : undefined,
+    clientSecret: typeof parsed.clientSecret === 'string' ? parsed.clientSecret : undefined,
     userId: typeof parsed.userId === 'string' ? parsed.userId : undefined,
     broadcasterId:
       typeof parsed.broadcasterId === 'string' ? parsed.broadcasterId : undefined,

@@ -1,40 +1,47 @@
 // Shared data-model types for config store and in-memory registries.
 // Mirror tech-spec "Data Models" section — keep in sync if the spec changes.
 
+export interface SlotGroup {
+  id: string;
+  name: string;
+}
+
 export interface BaseSlot {
   id: string;
-  type: 'mask' | 'media' | 'meme';
+  type: 'media' | 'meme' | 'music';
   enabled: boolean;
   rewardId: string;
   rewardTitle: string;
-}
-
-export interface MaskSlot extends BaseSlot {
-  type: 'mask';
-  lensId: string;
-  lensName: string;
-  hotkey: string;
+  groupId?: string;
 }
 
 export interface MediaSlot extends BaseSlot {
   type: 'media';
   filePath: string;
+  scale?: number; // 1–5, default 3
 }
 
 export interface MemeSlot extends BaseSlot {
   type: 'meme';
   folderPath: string;
+  scale?: number; // 1–5, default 3
 }
 
-export type Slot = MaskSlot | MediaSlot | MemeSlot;
+export interface MusicSlot extends BaseSlot {
+  type: 'music';
+  scale?: number;
+}
+
+export type Slot = MediaSlot | MemeSlot | MusicSlot;
 
 export interface Config {
   slots: Slot[];
-  removeMaskHotkey: string;
-  clientId?: string;        // Twitch application Client ID
+  groups: SlotGroup[];
+  clientId?: string;
+  clientSecret?: string;
   userId?: string;
   broadcasterId?: string;
-  tokenExpiresAt?: string; // ISO 8601
+  tokenExpiresAt?: string;
 }
 
 export interface LogEntry {
@@ -53,7 +60,7 @@ export interface MediaRegistryEntry {
 
 export const DEFAULT_CONFIG: Config = {
   slots: [],
-  removeMaskHotkey: '',
+  groups: [],
 };
 
 export const MAX_SLOTS = 5;

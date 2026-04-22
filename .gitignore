@@ -25,6 +25,7 @@ __pycache__/
 # Build outputs
 dist/
 build/
+release/
 .next/
 out/
 
@@ -53,3 +54,10 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Dev helper scripts (not part of the app)
+7za_wrapper.c
+7za_wrapper.js
+7za_wrapper_compiled.exe
+import_lenses.mjs
+get_token.py

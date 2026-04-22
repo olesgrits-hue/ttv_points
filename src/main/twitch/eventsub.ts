@@ -17,7 +17,8 @@ export interface RedemptionEvent {
   userLogin: string;
   userDisplayName: string;
   redemptionId: string;
-  redeemedAt: string; // ISO 8601
+  redeemedAt: string;
+  userInput?: string;
 }
 
 interface WelcomePayload {
@@ -49,6 +50,7 @@ interface NotificationPayload {
       user_id: string;
       user_name: string;
       user_login: string;
+      user_input?: string;
     };
   };
 }
@@ -161,9 +163,10 @@ export class EventSubClient extends EventEmitter {
         userId: ev.user_id,
         userName: ev.user_name,
         userLogin: ev.user_login,
-        userDisplayName: ev.user_name,  // Twitch user_name IS the display name
+        userDisplayName: ev.user_name,
         redemptionId: ev.id,
         redeemedAt: ((ev as Record<string, unknown>)['redeemed_at'] as string | undefined) ?? new Date().toISOString(),
+        userInput: ev.user_input,
       };
       this.emit('redemption', redemption);
     }

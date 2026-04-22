@@ -10,7 +10,8 @@ export interface RedemptionEvent {
   rewardTitle: string;
   userLogin: string;
   userDisplayName: string;
-  redeemedAt: string; // ISO 8601
+  redeemedAt: string;
+  userInput?: string;
 }
 
 /** Interface every action handler must satisfy. */
