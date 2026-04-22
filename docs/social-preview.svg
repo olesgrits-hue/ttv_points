@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" shape-rendering="crispEdges">
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="#0d0d0d"/>
+
+  <!-- Subtle scanlines (every 4px, very faint) -->
+  <pattern id="scan" x="0" y="0" width="1" height="4" patternUnits="userSpaceOnUse">
+    <rect width="1" height="1" fill="#ffffff" opacity="0.018"/>
+  </pattern>
+  <rect width="1280" height="640" fill="url(#scan)"/>
+
+  <!-- Left green accent bar -->
+  <rect x="72" y="64" width="3" height="512" fill="#00c896" opacity="0.7"/>
+
+  <!-- ── PIXEL ART T ICON  (right side, 300×300, semi-transparent) ── -->
+  <!-- Bar -->
+  <rect x="860" y="152" width="375" height="90" fill="#00c896" opacity="0.08"/>
+  <!-- Stem -->
+  <rect x="985" y="242" width="125" height="280" fill="#00c896" opacity="0.08"/>
+
+  <!-- Solid pixel T icon (smaller, more defined) -->
+  <!-- Bar -->
+  <rect x="876" y="168" width="342" height="58" fill="#00c896" opacity="0.22"/>
+  <!-- Stem -->
+  <rect x="997" y="226" width="100" height="244" fill="#00c896" opacity="0.22"/>
+
+  <!-- ── TITLE ── -->
+  <text
+    x="112" y="244"
+    font-family="'Courier New', Consolas, 'Lucida Console', monospace"
+    font-size="128"
+    font-weight="bold"
+    fill="#00c896"
+    letter-spacing="-4"
+  >ttweaks</text>
+
+  <!-- Title underline -->
+  <rect x="112" y="268" width="680" height="2" fill="#00c896" opacity="0.35"/>
+
+  <!-- ── SUBTITLE ── -->
+  <text
+    x="112" y="340"
+    font-family="'Courier New', Consolas, 'Lucida Console', monospace"
+    font-size="34"
+    fill="#e0e0e0"
+    letter-spacing="0"
+  >Channel Points → видео, мемы, Яндекс Музыка</text>
+
+  <!-- ── TAGS ── -->
+  <text
+    x="112" y="400"
+    font-family="'Courier New', Consolas, 'Lucida Console', monospace"
+    font-size="24"
+    fill="#555555"
+  >Twitch  ·  OBS Overlay  ·  Windows  ·  Portable .exe</text>
+
+  <!-- ── PROMPT LINE ── -->
+  <text
+    x="112" y="484"
+    font-family="'Courier New', Consolas, 'Lucida Console', monospace"
+    font-size="26"
+    fill="#00c896"
+    opacity="0.9"
+  >&#62; Скачай. Положи рядом с OBS. Запусти.</text>
+
+  <!-- Cursor blink block after prompt -->
+  <rect x="756" y="458" width="16" height="28" fill="#00c896" opacity="0.8"/>
+
+  <!-- ── CORNER PIXELS (Twitch purple accents) ── -->
+  <rect x="48" y="48"   width="16" height="16" fill="#9147ff"/>
+  <rect x="64" y="48"   width="8"  height="8"  fill="#9147ff" opacity="0.5"/>
+  <rect x="1216" y="48"  width="16" height="16" fill="#9147ff"/>
+  <rect x="1192" y="48"  width="8"  height="8"  fill="#9147ff" opacity="0.5"/>
+  <rect x="48" y="576"  width="16" height="16" fill="#9147ff"/>
+  <rect x="64" y="584"  width="8"  height="8"  fill="#9147ff" opacity="0.5"/>
+  <rect x="1216" y="576" width="16" height="16" fill="#9147ff"/>
+  <rect x="1192" y="584" width="8"  height="8"  fill="#9147ff" opacity="0.5"/>
+
+  <!-- Bottom right: version badge -->
+  <rect x="1090" y="568" width="150" height="36" fill="#1a1a1a" rx="0"/>
+  <rect x="1090" y="568" width="3"   height="36" fill="#9147ff"/>
+  <text
+    x="1102" y="592"
+    font-family="'Courier New', Consolas, monospace"
+    font-size="20"
+    fill="#999999"
+  >v1.0.0  win/x64</text>
+
+</svg>

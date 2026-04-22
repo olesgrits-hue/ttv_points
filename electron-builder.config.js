@@ -5,8 +5,9 @@
  * as the base path for config.json so settings survive exe replacement.
  */
 module.exports = {
-  appId: 'dev.twitchhelper.app',
-  productName: 'Twitch Helper',
+  appId: 'dev.ttweaks.app',
+  productName: 'ttweaks',
+  icon: 'build/icon.ico',
   directories: {
     output: 'release',
     buildResources: 'build',
@@ -29,11 +30,11 @@ module.exports = {
         arch: ['x64'],
       },
     ],
-    artifactName: 'twitch-helper.exe',
+    artifactName: 'ttweaks.exe',
     sign: false,
     certificateSubjectName: undefined,
   },
   portable: {
-    artifactName: 'twitch-helper.exe',
+    artifactName: 'ttweaks.exe',
   },
 };

@@ -10,7 +10,7 @@
 
 <br/>
 
-[**⬇ Скачать twitch-helper.exe**](https://github.com/olesgrits-hue/ttv_points/releases/latest)
+[**⬇ Скачать ttweaks.exe**](https://github.com/olesgrits-hue/ttv_points/releases/latest)
 
 </div>
 
@@ -43,7 +43,7 @@
 
 ### 1. Скачай и запусти
 
-Скачай `twitch-helper.exe` со страницы [Releases](https://github.com/olesgrits-hue/ttv_points/releases/latest), положи в любую папку, запусти.
+Скачай `ttweaks.exe` со страницы [Releases](https://github.com/olesgrits-hue/ttv_points/releases/latest), положи в любую папку, запусти.
 
 ### 2. Авторизуйся в Twitch
 
@@ -98,7 +98,7 @@ npm run dev
 
 ```bash
 npm run build
-# → release/twitch-helper.exe
+# → release/ttweaks.exe
 ```
 
 ---
