@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import WebSocket from 'ws';
 import { AuthStore } from '../store/auth';
 import { ConfigStore } from '../store/config';
+import { TWITCH_CLIENT_ID as BUNDLED_CLIENT_ID } from './twitch-creds';
 
 const EVENTSUB_URL = 'wss://eventsub.wss.twitch.tv/ws';
 const SUBSCRIPTION_API = 'https://api.twitch.tv/helix/eventsub/subscriptions';
@@ -177,7 +178,7 @@ export class EventSubClient extends EventEmitter {
     const broadcasterId = cfg.broadcasterId ?? '';
     const tokens = await this.authStore.getTokens();
     const accessToken = tokens?.accessToken ?? '';
-    const clientId = cfg.clientId ?? process.env.TWITCH_CLIENT_ID ?? '';
+    const clientId = cfg.clientId ?? process.env.TWITCH_CLIENT_ID ?? BUNDLED_CLIENT_ID;
 
     const res = await fetch(SUBSCRIPTION_API, {
       method: 'POST',

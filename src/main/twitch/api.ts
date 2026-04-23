@@ -2,6 +2,7 @@ import { ConfigStore } from '../store/config';
 import { AuthStore } from '../store/auth';
 import { TwitchAuth } from './auth';
 import { BrowserWindow } from 'electron';
+import { TWITCH_CLIENT_ID as BUNDLED_CLIENT_ID } from './twitch-creds';
 
 const API_BASE = 'https://api.twitch.tv/helix';
 
@@ -140,7 +141,7 @@ export class TwitchApiClient {
     }
     const { accessToken } = tokens;
     const cfg = this.configStore.read();
-    const clientId = cfg.clientId ?? process.env.TWITCH_CLIENT_ID ?? '';
+    const clientId = cfg.clientId ?? process.env.TWITCH_CLIENT_ID ?? BUNDLED_CLIENT_ID;
 
     const headers = {
       Authorization: `Bearer ${accessToken}`,
