@@ -7,17 +7,25 @@ import { RedemptionEvent } from './types';
 
 // TODO(bootstrap): in main/index.ts create Queue singleton, pass ConfigStore + TwitchClient + TwitchApiClient
 
+export interface QueueState {
+  current: RedemptionEvent | null;
+  pending: RedemptionEvent[];
+}
+
 /**
  * FIFO redemption queue. Processes one item at a time.
  *
  * Events:
- *   'paused'  — processing paused (disconnected or manual)
- *   'resumed' — processing resumed (connected or manual)
+ *   'paused'     — processing paused (disconnected or manual)
+ *   'resumed'    — processing resumed (connected or manual)
+ *   'stateChange' — QueueState changed (enqueue/skip/clear/dispatch start|end)
+ *   'skip'       — skip current item requested (listeners should abort playback)
  */
 export class Queue extends EventEmitter {
   private readonly _items: RedemptionEvent[] = [];
   private _processing = false;
   private _paused = false;
+  private _current: RedemptionEvent | null = null;
   private readonly dispatcher: Dispatcher;
 
   constructor(
@@ -52,7 +60,23 @@ export class Queue extends EventEmitter {
     }
 
     this._items.push(redemption);
+    this._emitState();
     this._processNext();
+  }
+
+  /** Emit 'skip' to signal that the current playback should be aborted. */
+  skip(): void {
+    this.emit('skip');
+  }
+
+  /** Remove all pending (not yet started) items from the queue. */
+  clear(): void {
+    this._items.length = 0;
+    this._emitState();
+  }
+
+  getState(): QueueState {
+    return { current: this._current, pending: [...this._items] };
   }
 
   pause(): void {
@@ -78,14 +102,21 @@ export class Queue extends EventEmitter {
     if (this._paused || this._processing || this._items.length === 0) return;
 
     this._processing = true;
-    const item = this._items.shift()!;
+    this._current = this._items.shift()!;
+    this._emitState();
 
     this.dispatcher
-      .dispatch(item)
+      .dispatch(this._current)
       .catch(() => {/* dispatcher catches all errors internally */})
       .finally(() => {
         this._processing = false;
+        this._current = null;
+        this._emitState();
         this._processNext();
       });
+  }
+
+  private _emitState(): void {
+    this.emit('stateChange', this.getState());
   }
 }

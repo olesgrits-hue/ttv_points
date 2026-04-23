@@ -1,5 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
+
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.aac', '.flac', '.m4a']);
 import { v4 as uuid } from 'uuid';
 import { BrowserWindow } from 'electron';
 import { MediaSlot, MemeSlot, Slot, LogEntry } from '../store/types';
@@ -120,8 +122,10 @@ export class MediaAction {
     const id = this.overlayServer.registry.register(filePath);
     try {
       // play() pushes the WS command and waits for playback_ended OR 120s timeout.
-      const scale = (slot as MediaSlot | MemeSlot).scale ?? 3;
-      await this.overlayServer.play(id, filePath, scale, slot.type === 'meme', slot.groupId ?? 'default');
+      const s = slot as MediaSlot | MemeSlot;
+      const scale = s.scale ?? 3;
+      const isAudio = AUDIO_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+      await this.overlayServer.play(id, filePath, scale, slot.type === 'meme', slot.groupId ?? 'default', isAudio, s.overlayWidth, s.overlayHeight);
       await this.twitchApi.fulfillRedemption(redemption.rewardId, redemption.id);
       success = true;
     } catch (err) {

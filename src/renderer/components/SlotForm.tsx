@@ -34,6 +34,9 @@ export function SlotForm({ onClose, onCreated }: SlotFormProps): React.ReactElem
   const [newRewardCooldown, setNewRewardCooldown] = useState('');
   const [filePath, setFilePath] = useState('');
   const [folderPath, setFolderPath] = useState('');
+  const [overlayWidth, setOverlayWidth] = useState('');
+  const [overlayHeight, setOverlayHeight] = useState('');
+  const [showPlayer, setShowPlayer] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,12 +74,14 @@ export function SlotForm({ onClose, onCreated }: SlotFormProps): React.ReactElem
     }
 
     let payload: Omit<Slot, 'id'>;
+    const w = overlayWidth ? parseInt(overlayWidth, 10) : undefined;
+    const h = overlayHeight ? parseInt(overlayHeight, 10) : undefined;
     if (slotType === 'media') {
-      payload = { type: 'media', enabled: true, rewardId, rewardTitle, filePath };
+      payload = { type: 'media', enabled: true, rewardId, rewardTitle, filePath, overlayWidth: w, overlayHeight: h };
     } else if (slotType === 'meme') {
-      payload = { type: 'meme', enabled: true, rewardId, rewardTitle, folderPath };
+      payload = { type: 'meme', enabled: true, rewardId, rewardTitle, folderPath, overlayWidth: w, overlayHeight: h };
     } else {
-      payload = { type: 'music', enabled: true, rewardId, rewardTitle };
+      payload = { type: 'music', enabled: true, rewardId, rewardTitle, showPlayer };
     }
 
     try {
@@ -198,10 +203,33 @@ export function SlotForm({ onClose, onCreated }: SlotFormProps): React.ReactElem
           </div>
         )}
 
-        {slotType === 'music' && (
-          <div style={{ ...sectionStyle, padding: '8px', background: T.bg, borderLeft: `2px solid ${T.accentDim}`, fontSize: '0.82em', color: T.textSoft }}>
-            Зритель вводит название трека или ссылку music.yandex.ru в сообщении к реварду.
+        {(slotType === 'media' || slotType === 'meme') && (
+          <div style={sectionStyle}>
+            <span style={labelStyle}>РАЗМЕР В ОВЕРЛЕЕ (пусто = авто)</span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input type="number" placeholder="Ширина" value={overlayWidth} onChange={(e) => setOverlayWidth(e.target.value)} style={{ flex: 1 }} />
+              <input type="number" placeholder="Высота" value={overlayHeight} onChange={(e) => setOverlayHeight(e.target.value)} style={{ flex: 1 }} />
+            </div>
           </div>
+        )}
+
+        {slotType === 'music' && (
+          <>
+            <div style={{ ...sectionStyle, padding: '8px', background: T.bg, borderLeft: `2px solid ${T.accentDim}`, fontSize: '0.82em', color: T.textSoft }}>
+              Зритель вводит название трека или ссылку music.yandex.ru в сообщении к реварду.
+            </div>
+            <div style={{ ...sectionStyle, display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                onClick={() => setShowPlayer((v) => !v)}
+                style={{ ...radioStyle(showPlayer), minWidth: '90px' }}
+              >
+                {showPlayer ? '[✓] Плеер' : '[ ] Плеер'}
+              </button>
+              <span style={{ fontSize: '0.78em', color: T.textSoft }}>
+                {showPlayer ? 'Показывать vinyl-анимацию' : 'Только звук, без визуала'}
+              </span>
+            </div>
+          </>
         )}
 
         {error && (

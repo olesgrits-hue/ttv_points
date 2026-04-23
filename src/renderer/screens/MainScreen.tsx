@@ -3,6 +3,7 @@ import { EventLog } from '../components/EventLog';
 import { SlotCard } from '../components/SlotCard';
 import { SlotForm } from '../components/SlotForm';
 import type { LogEntry, Slot, SlotGroup } from '../../main/store/types';
+import type { QueueItemState } from '../electron.d';
 import { T } from '../theme';
 
 const OVERLAY_BASE = 'http://127.0.0.1:7891/overlay';
@@ -10,7 +11,7 @@ const MAX_LOG_ENTRIES = 200;
 const MAX_SLOTS = 5;
 const GITHUB_ISSUES = 'https://github.com/olesgrits-hue/ttv_points/issues/new';
 
-type Tab = 'slots' | 'logs' | 'settings' | 'about';
+type Tab = 'slots' | 'queue' | 'logs' | 'settings' | 'about';
 
 const sectionStyle: React.CSSProperties = {
   border: `1px solid ${T.border}`,
@@ -32,17 +33,35 @@ export function MainScreen(): React.ReactElement {
   const [yamUserCode, setYamUserCode] = useState('');
   const [yamError, setYamError] = useState('');
   const [bugDesc, setBugDesc] = useState('');
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'available' | 'ready'>('idle');
+  const [updateVersion, setUpdateVersion] = useState('');
+  const emptyQueueState: QueueItemState = { current: null, pending: [] };
+  const [queueState, setQueueState] = useState<{ media: QueueItemState; music: QueueItemState }>({
+    media: emptyQueueState,
+    music: emptyQueueState,
+  });
 
   useEffect(() => {
     window.electronAPI.slotsList().then(setSlots).catch(console.error);
     window.electronAPI.groupsList().then(setGroups).catch(console.error);
     window.electronAPI.settingsGetYamToken().then((t) => { if (t) setYamSaved(true); }).catch(console.error);
 
+    window.electronAPI.queueGetState().then(setQueueState).catch(console.error);
+
     const unsubStatus = window.electronAPI.onTwitchStatus(({ connected: c }) => setConnected(c));
     const unsubLog = window.electronAPI.onLogEntry((entry) => {
       setEntries((prev) => [entry, ...prev].slice(0, MAX_LOG_ENTRIES));
     });
-    return (): void => { unsubStatus(); unsubLog(); };
+    const unsubQueue = window.electronAPI.onQueueState(setQueueState);
+    const unsubUpdateAvail = window.electronAPI.onUpdateAvailable(({ version }) => {
+      setUpdateVersion(version);
+      setUpdateStatus('available');
+    });
+    const unsubUpdateReady = window.electronAPI.onUpdateDownloaded(({ version }) => {
+      setUpdateVersion(version);
+      setUpdateStatus('ready');
+    });
+    return (): void => { unsubStatus(); unsubLog(); unsubQueue(); unsubUpdateAvail(); unsubUpdateReady(); };
   }, []);
 
   const handleSlotCreated = (slot: Slot): void => setSlots((prev) => [...prev, slot]);
@@ -96,6 +115,7 @@ export function MainScreen(): React.ReactElement {
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'slots', label: 'СЛОТЫ' },
+    { id: 'queue', label: 'ОЧЕРЕДЬ' },
     { id: 'logs', label: 'ЛОГИ' },
     { id: 'settings', label: 'НАСТРОЙКИ' },
     { id: 'about', label: 'О ПРОГРАММЕ' },
@@ -113,7 +133,7 @@ export function MainScreen(): React.ReactElement {
         background: T.surface,
         flexShrink: 0,
       }}>
-        <span style={{ color: T.accent, fontSize: '0.85em', letterSpacing: '0.15em' }}>SNAP_CAM</span>
+        <span style={{ color: T.accent, fontSize: '0.85em', letterSpacing: '0.15em' }}>TTWeaks</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{
             width: '7px', height: '7px', borderRadius: '50%',
@@ -217,6 +237,63 @@ export function MainScreen(): React.ReactElement {
               <button onClick={() => void handleAddGroup()}>+ группа</button>
             </div>
           </>
+        )}
+
+        {/* ── QUEUE TAB ── */}
+        {tab === 'queue' && (
+          <section style={sectionStyle}>
+            <div style={{ color: T.accent, fontSize: '0.85em', letterSpacing: '0.1em', marginBottom: '12px' }}>
+              / ОЧЕРЕДЬ
+            </div>
+
+            {/* Media queue */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: T.textSoft, fontSize: '0.78em', letterSpacing: '0.05em' }}>МЕДИА / МЕМ</span>
+                <button onClick={() => void window.electronAPI.queueClearMedia()} style={{ fontSize: '0.72em', color: T.warning, borderColor: T.warning }}>
+                  очистить
+                </button>
+              </div>
+              {queueState.media.current ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ color: T.accent, fontSize: '0.78em' }}>▶</span>
+                  <span style={{ fontSize: '0.82em' }}>{queueState.media.current.userDisplayName} — {queueState.media.current.rewardTitle}</span>
+                  <button onClick={() => void window.electronAPI.queueSkip()} style={{ fontSize: '0.72em', marginLeft: 'auto' }}>skip</button>
+                </div>
+              ) : (
+                <div style={{ color: T.textMuted, fontSize: '0.8em' }}>нет активного воспроизведения</div>
+              )}
+              {queueState.media.pending.map((item, i) => (
+                <div key={i} style={{ fontSize: '0.78em', color: T.textSoft, paddingLeft: '14px', paddingTop: '2px' }}>
+                  {i + 1}. {item.userDisplayName} — {item.rewardTitle}
+                </div>
+              ))}
+            </div>
+
+            {/* Music queue */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: T.textSoft, fontSize: '0.78em', letterSpacing: '0.05em' }}>МУЗЫКА</span>
+                <button onClick={() => void window.electronAPI.queueClearMusic()} style={{ fontSize: '0.72em', color: T.warning, borderColor: T.warning }}>
+                  очистить
+                </button>
+              </div>
+              {queueState.music.current ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ color: T.purple, fontSize: '0.78em' }}>♪</span>
+                  <span style={{ fontSize: '0.82em' }}>{queueState.music.current.userDisplayName} — {queueState.music.current.rewardTitle}</span>
+                  <button onClick={() => void window.electronAPI.queueSkip()} style={{ fontSize: '0.72em', marginLeft: 'auto' }}>skip</button>
+                </div>
+              ) : (
+                <div style={{ color: T.textMuted, fontSize: '0.8em' }}>нет активного воспроизведения</div>
+              )}
+              {queueState.music.pending.map((item, i) => (
+                <div key={i} style={{ fontSize: '0.78em', color: T.textSoft, paddingLeft: '14px', paddingTop: '2px' }}>
+                  {i + 1}. {item.userDisplayName} — {item.rewardTitle}
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* ── LOGS TAB ── */}
@@ -330,7 +407,7 @@ export function MainScreen(): React.ReactElement {
         {tab === 'about' && (
           <section style={sectionStyle}>
             <div style={{ color: T.accent, fontSize: '1em', letterSpacing: '0.15em', marginBottom: '16px' }}>
-              SNAP_CAM v1.0.0
+              TTWeaks v1.1.0
             </div>
             <div style={{ color: T.textSoft, fontSize: '0.85em', lineHeight: '1.8', marginBottom: '20px' }}>
               Портативный оверлей для OBS.<br />
@@ -354,9 +431,27 @@ export function MainScreen(): React.ReactElement {
                 style={{ color: T.textSoft, cursor: 'pointer', fontSize: '0.85em' }}
                 onClick={() => void window.electronAPI.shellOpenExternal('https://github.com/olesgrits-hue/ttv_points')}
               >
-                {'> github: snap-cam'}
+                {'> github: ttweaks'}
               </span>
             </div>
+
+            {updateStatus !== 'idle' && (
+              <div style={{ marginTop: '16px', padding: '10px', border: `1px solid ${T.accent}`, background: `${T.accent}10` }}>
+                <div style={{ fontSize: '0.82em', color: T.accent, marginBottom: '6px' }}>
+                  {updateStatus === 'available'
+                    ? `Доступно обновление v${updateVersion} — загружается...`
+                    : `Обновление v${updateVersion} готово к установке`}
+                </div>
+                {updateStatus === 'ready' && (
+                  <button
+                    onClick={() => void window.electronAPI.updateInstall()}
+                    style={{ fontSize: '0.8em', borderColor: T.accent, color: T.accent }}
+                  >
+                    Перезапустить и обновить
+                  </button>
+                )}
+              </div>
+            )}
           </section>
         )}
       </div>

@@ -44,17 +44,20 @@ function validateSlotPayload(payload: unknown): Omit<Slot, 'id'> {
   const type = p['type'] as 'media' | 'meme' | 'music';
   const base = { enabled: p['enabled'] as boolean, rewardId: p['rewardId'] as string, rewardTitle: p['rewardTitle'] as string };
   if (type === 'music') {
-    return { ...base, type } as Omit<Slot, 'id'>;
+    const showPlayer = typeof p['showPlayer'] === 'boolean' ? p['showPlayer'] : true;
+    return { ...base, type, showPlayer } as Omit<Slot, 'id'>;
   }
+  const overlayWidth = typeof p['overlayWidth'] === 'number' && isFinite(p['overlayWidth'] as number) ? p['overlayWidth'] as number : undefined;
+  const overlayHeight = typeof p['overlayHeight'] === 'number' && isFinite(p['overlayHeight'] as number) ? p['overlayHeight'] as number : undefined;
   if (type === 'media') {
     assertString(p['filePath'], 'filePath');
     const scale = typeof p['scale'] === 'number' ? Math.min(5, Math.max(1, Math.round(p['scale']))) : 3;
-    return { ...base, type, filePath: p['filePath'] as string, scale } as Omit<Slot, 'id'>;
+    return { ...base, type, filePath: p['filePath'] as string, scale, overlayWidth, overlayHeight } as Omit<Slot, 'id'>;
   }
   // meme
   assertString(p['folderPath'], 'folderPath');
   const scale = typeof p['scale'] === 'number' ? Math.min(5, Math.max(1, Math.round(p['scale']))) : 3;
-  return { ...base, type, folderPath: p['folderPath'] as string, scale } as Omit<Slot, 'id'>;
+  return { ...base, type, folderPath: p['folderPath'] as string, scale, overlayWidth, overlayHeight } as Omit<Slot, 'id'>;
 }
 
 export function registerSlotIpcHandlers(
@@ -139,7 +142,7 @@ export function registerSlotIpcHandlers(
   ipcMain.handle('dialog:openFile', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
-      filters: [{ name: 'Media', extensions: ['mp4', 'webm', 'gif', 'png', 'jpg', 'jpeg'] }],
+      filters: [{ name: 'Media', extensions: ['mp4', 'webm', 'gif', 'png', 'jpg', 'jpeg', 'mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'] }],
     });
     return result.canceled ? null : result.filePaths[0] ?? null;
   });

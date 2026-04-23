@@ -2,6 +2,11 @@ import type { LogEntry, Slot, SlotGroup } from '../main/store/types';
 
 export interface RewardInfo { rewardId: string; rewardTitle: string; }
 
+export interface QueueItemState {
+  current: { rewardTitle: string; userDisplayName: string } | null;
+  pending: Array<{ rewardTitle: string; userDisplayName: string }>;
+}
+
 export interface ElectronAPI {
   login: () => Promise<void>;
   checkAuth: () => Promise<boolean>;
@@ -32,6 +37,19 @@ export interface ElectronAPI {
   settingsSetYamToken: (token: string) => Promise<void>;
   settingsYamDeviceAuth: () => Promise<string>;
   onYamDeviceProgress: (cb: (p: { verification_url: string; user_code: string }) => void) => () => void;
+  // Queue
+  queueGetState: () => Promise<{ media: QueueItemState; music: QueueItemState }>;
+  queueSkip: () => Promise<void>;
+  queueClearMedia: () => Promise<void>;
+  queueClearMusic: () => Promise<void>;
+  onQueueState: (cb: (state: { media: QueueItemState; music: QueueItemState }) => void) => () => void;
+  // Onboarding
+  onboardingCheck: () => Promise<boolean>;
+  onboardingComplete: () => Promise<void>;
+  // Auto-update
+  onUpdateAvailable: (cb: (info: { version: string }) => void) => () => void;
+  onUpdateDownloaded: (cb: (info: { version: string }) => void) => () => void;
+  updateInstall: () => Promise<void>;
 }
 
 declare global {

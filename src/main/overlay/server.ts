@@ -10,8 +10,8 @@ const PORT = 7891;
 const PLAYBACK_TIMEOUT_MS = 120_000;
 
 type PlaybackEndedMessage = { type: 'playback_ended'; id?: string };
-type PlayMessage = { type: 'play'; id: string; url: string; scale: number; isMeme: boolean };
-type PlayMusicMessage = { type: 'play_music'; url: string; title: string; artist: string; coverUrl: string; duration: number; scale: number };
+type PlayMessage = { type: 'play'; id: string; url: string; scale: number; isMeme: boolean; isAudio: boolean; width?: number; height?: number };
+type PlayMusicMessage = { type: 'play_music'; url: string; title: string; artist: string; coverUrl: string; duration: number; scale: number; showPlayer: boolean };
 type RegisterMessage = { type: 'register'; groupId: string };
 type ClientInbound = PlaybackEndedMessage | RegisterMessage | { type: string };
 
@@ -100,7 +100,7 @@ export class OverlayServer {
   }
 
   /** Push a play command to the group overlay and wait for playback_ended or timeout. */
-  play(id: string, _filePath: string, scale = 3, isMeme = false, groupId = 'default'): Promise<void> {
+  play(id: string, _filePath: string, scale = 3, isMeme = false, groupId = 'default', isAudio = false, width?: number, height?: number): Promise<void> {
     if (this.pendingPlaybacks.has(groupId)) {
       return Promise.reject(new Error(`OverlayServer.play: another playback is in progress for group ${groupId}`));
     }
@@ -108,7 +108,7 @@ export class OverlayServer {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error(`OverlayServer.play: no connected overlay for group "${groupId}"`));
     }
-    const msg: PlayMessage = { type: 'play', id, url: `/media/${id}`, scale, isMeme };
+    const msg: PlayMessage = { type: 'play', id, url: `/media/${id}`, scale, isMeme, isAudio, width, height };
 
     return new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
@@ -137,7 +137,7 @@ export class OverlayServer {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error(`OverlayServer.playMusic: no connected overlay for group "${groupId}"`));
     }
-    const msg: PlayMusicMessage = { ...payload, type: 'play_music' };
+    const msg: PlayMusicMessage = { ...payload, type: 'play_music', showPlayer: payload.showPlayer ?? true };
     // Use actual track duration + 30s gap + 15s buffer as timeout
     const timeoutMs = payload.duration > 0
       ? (payload.duration + 45) * 1000
@@ -159,6 +159,15 @@ export class OverlayServer {
         resolve();
       }
     });
+  }
+
+  /** Immediately resolve all pending playbacks (used for skip). */
+  skipAll(): void {
+    for (const [groupId, pending] of this.pendingPlaybacks) {
+      clearTimeout(pending.timer);
+      this.pendingPlaybacks.delete(groupId);
+      pending.resolve();
+    }
   }
 
   // --- Internal ---------------------------------------------------------

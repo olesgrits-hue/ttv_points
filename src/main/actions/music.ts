@@ -60,6 +60,7 @@ export class MusicAction {
           coverUrl: track.coverUri ?? '',
           duration: Math.ceil(track.durationMs / 1000),
           scale: musicSlot.scale ?? 1,
+          showPlayer: musicSlot.showPlayer ?? true,
         },
         groupId,
       );

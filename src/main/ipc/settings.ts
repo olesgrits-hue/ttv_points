@@ -1,8 +1,9 @@
 import { ipcMain } from 'electron';
 import { AuthStore } from '../store/auth';
+import { ConfigStore } from '../store/config';
 import { loginWithDeviceFlow, DeviceAuthProgress } from '../yandex/auth-window';
 
-export function registerSettingsIpcHandlers(authStore: AuthStore): void {
+export function registerSettingsIpcHandlers(authStore: AuthStore, configStore?: ConfigStore): void {
   ipcMain.handle('settings:getYamToken', () => {
     return authStore.getYamToken();
   });
@@ -23,5 +24,16 @@ export function registerSettingsIpcHandlers(authStore: AuthStore): void {
     });
     await authStore.saveYamToken(token);
     return token;
+  });
+
+  ipcMain.handle('onboarding:check', () => {
+    if (!configStore) return true;
+    return configStore.read().onboardingDone === true;
+  });
+
+  ipcMain.handle('onboarding:complete', () => {
+    if (!configStore) return;
+    const cfg = configStore.read();
+    configStore.write({ ...cfg, onboardingDone: true });
   });
 }

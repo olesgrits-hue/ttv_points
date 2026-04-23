@@ -13,5 +13,5 @@ export const T = {
   warning: '#f5a623',
   success: '#00c896',
   purple: '#9147ff',
-  font: "'Courier New', Consolas, monospace",
+  font: "'Cascadia Code', Consolas, 'Lucida Console', monospace",
 } as const;

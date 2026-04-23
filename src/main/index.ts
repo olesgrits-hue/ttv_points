@@ -19,6 +19,8 @@ import { registerAuthIpcHandlers, checkAuthOnStartup } from './ipc/auth';
 import { registerSlotIpcHandlers } from './ipc/slots';
 import { registerGroupIpcHandlers } from './ipc/groups';
 import { registerSettingsIpcHandlers } from './ipc/settings';
+import { registerQueueIpcHandlers } from './ipc/queue';
+import { setupAutoUpdater } from './updater';
 import { GroupService } from './slots/group-service';
 
 // ---- Singletons (created exactly once) ----------------------------------------
@@ -42,8 +44,9 @@ registerActionHandlers(
   musicAction.execute.bind(musicAction) as ExecuteFn,
 );
 
-// Queue wired to TwitchClient for pause/resume
-const queue = new Queue(configStore, twitchClient, twitchApi);
+// Two independent queues: media/meme slots block each other; music runs in parallel
+const mediaQueue = new Queue(configStore, twitchClient, twitchApi);
+const musicQueue = new Queue(configStore, twitchClient, twitchApi);
 
 // ---- App lifecycle ------------------------------------------------------------
 
@@ -52,20 +55,29 @@ app.whenReady().then(async () => {
   registerAuthIpcHandlers(twitchAuth, authStore, configStore);
   registerSlotIpcHandlers(slotService, twitchApi);
   registerGroupIpcHandlers(groupService);
-  registerSettingsIpcHandlers(authStore);
+  registerSettingsIpcHandlers(authStore, configStore);
+  registerQueueIpcHandlers(mediaQueue, musicQueue, overlayServer);
 
   const win = createWindow();
 
   // Start overlay server
   overlayServer.start();
 
+  // Setup auto-updater (packaged builds only)
+  if (app.isPackaged) setupAutoUpdater();
+
   // Start Twitch connection + check auth on startup
   await checkAuthOnStartup(twitchAuth, authStore, configStore);
   twitchClient.start();
 
-  // Forward Twitch redemption events into the queue
+  // Route redemptions: music goes to musicQueue (parallel), media/meme to mediaQueue (serial)
   twitchClient.on('redemption', (ev) => {
-    queue.enqueue(ev);
+    const slot = configStore.getSlots().find((s) => s.rewardId === ev.rewardId);
+    if (slot?.type === 'music') {
+      musicQueue.enqueue(ev);
+    } else {
+      mediaQueue.enqueue(ev);
+    }
   });
 
   app.on('activate', () => {

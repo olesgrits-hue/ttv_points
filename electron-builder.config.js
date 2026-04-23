@@ -37,4 +37,9 @@ module.exports = {
   portable: {
     artifactName: 'ttweaks.exe',
   },
+  publish: {
+    provider: 'github',
+    owner: 'olesgrits-hue',
+    repo: 'ttv_points',
+  },
 };

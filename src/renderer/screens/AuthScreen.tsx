@@ -31,7 +31,7 @@ export function AuthScreen({ onLogin }: Props): React.ReactElement {
       gap: '16px',
     }}>
       <div style={{ fontSize: '18px', color: T.accent, letterSpacing: '0.1em', marginBottom: '8px' }}>
-        SNAP CAM
+        TTWeaks
       </div>
       <button
         onClick={handleLogin}

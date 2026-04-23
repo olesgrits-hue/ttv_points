@@ -28,6 +28,11 @@ export type Slot = MediaSlot | MemeSlot | MusicSlot;
 export interface RewardInfo { rewardId: string; rewardTitle: string; }
 export interface SlotGroup { id: string; name: string; }
 
+export interface QueueItemState {
+  current: { rewardTitle: string; userDisplayName: string } | null;
+  pending: Array<{ rewardTitle: string; userDisplayName: string }>;
+}
+
 export interface ElectronAPI {
   login: () => Promise<void>;
   checkAuth: () => Promise<boolean>;
@@ -58,6 +63,19 @@ export interface ElectronAPI {
   settingsSetYamToken: (token: string) => Promise<void>;
   settingsYamDeviceAuth: () => Promise<string>;
   onYamDeviceProgress: (cb: (p: { verification_url: string; user_code: string }) => void) => () => void;
+  // Queue
+  queueGetState: () => Promise<{ media: QueueItemState; music: QueueItemState }>;
+  queueSkip: () => Promise<void>;
+  queueClearMedia: () => Promise<void>;
+  queueClearMusic: () => Promise<void>;
+  onQueueState: (cb: (state: { media: QueueItemState; music: QueueItemState }) => void) => () => void;
+  // Onboarding
+  onboardingCheck: () => Promise<boolean>;
+  onboardingComplete: () => Promise<void>;
+  // Auto-update
+  onUpdateAvailable: (cb: (info: { version: string }) => void) => () => void;
+  onUpdateDownloaded: (cb: (info: { version: string }) => void) => () => void;
+  updateInstall: () => Promise<void>;
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -111,4 +129,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('settings:yamDeviceProgress', listener);
     return (): void => { ipcRenderer.removeListener('settings:yamDeviceProgress', listener); };
   },
+
+  queueGetState: () => ipcRenderer.invoke('queue:getState'),
+  queueSkip: () => ipcRenderer.invoke('queue:skip'),
+  queueClearMedia: () => ipcRenderer.invoke('queue:clearMedia'),
+  queueClearMusic: () => ipcRenderer.invoke('queue:clearMusic'),
+  onQueueState: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, state: { media: QueueItemState; music: QueueItemState }): void => cb(state);
+    ipcRenderer.on('queue:state', listener);
+    return (): void => { ipcRenderer.removeListener('queue:state', listener); };
+  },
+
+  onboardingCheck: () => ipcRenderer.invoke('onboarding:check'),
+  onboardingComplete: () => ipcRenderer.invoke('onboarding:complete'),
+
+  onUpdateAvailable: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, info: { version: string }): void => cb(info);
+    ipcRenderer.on('update:available', listener);
+    return (): void => { ipcRenderer.removeListener('update:available', listener); };
+  },
+  onUpdateDownloaded: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, info: { version: string }): void => cb(info);
+    ipcRenderer.on('update:downloaded', listener);
+    return (): void => { ipcRenderer.removeListener('update:downloaded', listener); };
+  },
+  updateInstall: () => ipcRenderer.invoke('update:install'),
 } satisfies ElectronAPI);

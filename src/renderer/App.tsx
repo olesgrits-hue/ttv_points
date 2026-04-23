@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { AuthScreen } from './screens/AuthScreen';
 import { MainScreen } from './screens/MainScreen';
+import { OnboardingScreen } from './screens/OnboardingScreen';
 import { T } from './theme';
 
-type Screen = 'auth' | 'main';
+type Screen = 'onboarding' | 'auth' | 'main';
 
 const GLOBAL_STYLE = `
   *, *::before, *::after { box-sizing: border-box; }
@@ -12,7 +13,7 @@ const GLOBAL_STYLE = `
     background: ${T.bg};
     color: ${T.text};
     font-family: ${T.font};
-    font-size: 13px;
+    font-size: 18px;
     line-height: 1.5;
   }
   ::-webkit-scrollbar { width: 6px; }
@@ -62,10 +63,18 @@ export function App(): React.ReactElement {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    window.electronAPI
-      .checkAuth()
-      .then((isAuth) => {
-        if (isAuth) setScreen('main');
+    Promise.all([
+      window.electronAPI.onboardingCheck(),
+      window.electronAPI.checkAuth(),
+    ])
+      .then(([onboardingDone, isAuth]) => {
+        if (!onboardingDone) {
+          setScreen('onboarding');
+        } else if (isAuth) {
+          setScreen('main');
+        } else {
+          setScreen('auth');
+        }
       })
       .catch(console.error)
       .finally(() => setAuthChecked(true));
@@ -81,7 +90,9 @@ export function App(): React.ReactElement {
   return (
     <>
       <style>{GLOBAL_STYLE}</style>
-      {screen === 'auth' ? <AuthScreen onLogin={() => setScreen('main')} /> : <MainScreen />}
+      {screen === 'onboarding' && <OnboardingScreen onComplete={() => setScreen('auth')} />}
+      {screen === 'auth' && <AuthScreen onLogin={() => setScreen('main')} />}
+      {screen === 'main' && <MainScreen />}
     </>
   );
 }

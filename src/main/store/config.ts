@@ -111,6 +111,7 @@ function normalize(parsed: Partial<Config>): Config {
       typeof parsed.broadcasterId === 'string' ? parsed.broadcasterId : undefined,
     tokenExpiresAt:
       typeof parsed.tokenExpiresAt === 'string' ? parsed.tokenExpiresAt : undefined,
+    onboardingDone: parsed.onboardingDone === true ? true : undefined,
   };
 }
 

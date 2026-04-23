@@ -19,17 +19,22 @@ export interface MediaSlot extends BaseSlot {
   type: 'media';
   filePath: string;
   scale?: number; // 1–5, default 3
+  overlayWidth?: number;
+  overlayHeight?: number;
 }
 
 export interface MemeSlot extends BaseSlot {
   type: 'meme';
   folderPath: string;
   scale?: number; // 1–5, default 3
+  overlayWidth?: number;
+  overlayHeight?: number;
 }
 
 export interface MusicSlot extends BaseSlot {
   type: 'music';
   scale?: number;
+  showPlayer?: boolean; // default true — false plays audio only, no vinyl UI
 }
 
 export type Slot = MediaSlot | MemeSlot | MusicSlot;
@@ -42,6 +47,7 @@ export interface Config {
   userId?: string;
   broadcasterId?: string;
   tokenExpiresAt?: string;
+  onboardingDone?: boolean;
 }
 
 export interface LogEntry {

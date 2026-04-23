@@ -10,6 +10,41 @@ const MEME_PADDING = 15;
 const MEME_BORDER_RADIUS = 12;
 const MAX_ROTATION_DEG = 15;
 
+// Shared AudioContext + DynamicsCompressor for auto-leveling all media/audio.
+// One context reused for every element to avoid multiple audio graphs.
+let _audioCtx: AudioContext | null = null;
+let _compressor: DynamicsCompressorNode | null = null;
+
+function getAudioGraph(): { ctx: AudioContext; compressor: DynamicsCompressorNode } {
+  if (!_audioCtx || _audioCtx.state === 'closed') {
+    _audioCtx = new AudioContext();
+    _compressor = _audioCtx.createDynamicsCompressor();
+    _compressor.threshold.value = -24;
+    _compressor.knee.value = 30;
+    _compressor.ratio.value = 12;
+    _compressor.attack.value = 0.003;
+    _compressor.release.value = 0.25;
+    _compressor.connect(_audioCtx.destination);
+  }
+  return { ctx: _audioCtx, compressor: _compressor! };
+}
+
+function connectToCompressor(el: HTMLMediaElement): void {
+  try {
+    const { ctx, compressor } = getAudioGraph();
+    const source = ctx.createMediaElementSource(el);
+    source.connect(compressor);
+    if (ctx.state === 'suspended') void ctx.resume();
+  } catch { /* element may already be connected */ }
+}
+
+// Keep AudioContext alive when OBS hides the source (visibilitychange).
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && _audioCtx) {
+    void _audioCtx.resume();
+  }
+});
+
 function getGroupId(): string {
   const w = window as Window & { __GROUP_ID__?: string };
   if (w.__GROUP_ID__) return w.__GROUP_ID__;
@@ -21,7 +56,16 @@ function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function createMediaElement(url: string, scale: number, isMeme: boolean): HTMLElement {
+function createMediaElement(url: string, scale: number, isMeme: boolean, isAudio = false, fixedWidth?: number, fixedHeight?: number): HTMLElement {
+  if (isAudio) {
+    const audio = document.createElement('audio');
+    audio.src = url;
+    audio.autoplay = true;
+    audio.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none;';
+    connectToCompressor(audio);
+    return audio;
+  }
+
   const deg = randomBetween(-MAX_ROTATION_DEG, MAX_ROTATION_DEG);
 
   const video = document.createElement('video');
@@ -30,6 +74,7 @@ function createMediaElement(url: string, scale: number, isMeme: boolean): HTMLEl
   video.muted = false;
   video.style.display = 'block';
   video.style.pointerEvents = 'none';
+  connectToCompressor(video);
 
   let container: HTMLElement;
 
@@ -47,8 +92,8 @@ function createMediaElement(url: string, scale: number, isMeme: boolean): HTMLEl
     video.addEventListener('loadedmetadata', () => {
       const longSide = BASE_LONG_SIDE * scale;
       const ratio = video.videoWidth / video.videoHeight;
-      const vw = ratio >= 1 ? longSide : Math.round(longSide * ratio);
-      const vh = ratio >= 1 ? Math.round(longSide / ratio) : longSide;
+      const vw = fixedWidth ?? (ratio >= 1 ? longSide : Math.round(longSide * ratio));
+      const vh = fixedHeight ?? (ratio >= 1 ? Math.round(longSide / ratio) : longSide);
       video.style.width = `${vw}px`;
       video.style.height = `${vh}px`;
       container.style.padding = `${MEME_PADDING}px`;
@@ -68,8 +113,8 @@ function createMediaElement(url: string, scale: number, isMeme: boolean): HTMLEl
     video.addEventListener('loadedmetadata', () => {
       const longSide = BASE_LONG_SIDE * scale;
       const ratio = video.videoWidth / video.videoHeight;
-      const vw = ratio >= 1 ? longSide : Math.round(longSide * ratio);
-      const vh = ratio >= 1 ? Math.round(longSide / ratio) : longSide;
+      const vw = fixedWidth ?? (ratio >= 1 ? longSide : Math.round(longSide * ratio));
+      const vh = fixedHeight ?? (ratio >= 1 ? Math.round(longSide / ratio) : longSide);
       video.style.width = `${vw}px`;
       video.style.height = `${vh}px`;
       const x = randomBetween(0, Math.max(0, window.innerWidth - vw));
@@ -85,7 +130,16 @@ function createMediaElement(url: string, scale: number, isMeme: boolean): HTMLEl
   return container;
 }
 
-function createMusicPlayer(url: string, title: string, artist: string, coverUrl: string, scale: number): { element: HTMLElement; audio: HTMLAudioElement } {
+function createMusicPlayer(url: string, title: string, artist: string, coverUrl: string, scale: number, showPlayer = true): { element: HTMLElement; audio: HTMLAudioElement } {
+  if (!showPlayer) {
+    const audio = document.createElement('audio');
+    audio.src = url;
+    audio.autoplay = true;
+    audio.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none;';
+    connectToCompressor(audio);
+    return { element: audio, audio };
+  }
+
   const s = scale;
   const discSize = Math.round(64 * s);
   const pad = Math.round(12 * s);
@@ -149,6 +203,7 @@ function createMusicPlayer(url: string, title: string, artist: string, coverUrl:
   audio.src = url;
   audio.autoplay = true;
   wrap.appendChild(audio);
+  connectToCompressor(audio);
 
   if (!document.getElementById('vinyl-spin-style')) {
     const style = document.createElement('style');
@@ -168,6 +223,9 @@ interface PlayMessage {
   url: string;
   scale?: number;
   isMeme?: boolean;
+  isAudio?: boolean;
+  width?: number;
+  height?: number;
 }
 
 interface PlayMusicMessage {
@@ -178,6 +236,7 @@ interface PlayMusicMessage {
   coverUrl: string;
   duration: number;
   scale?: number;
+  showPlayer?: boolean;
 }
 
 function connect(): void {
@@ -197,23 +256,25 @@ function connect(): void {
     }
 
     if (msg.type === 'play') {
-      const { url, scale = 3, isMeme = false, id } = msg as PlayMessage;
+      const { url, scale = 3, isMeme = false, isAudio = false, id, width, height } = msg as PlayMessage;
       if (!url) return;
-      const element = createMediaElement(url, scale, isMeme);
+      const element = createMediaElement(url, scale, isMeme, isAudio, width, height);
       document.body.appendChild(element);
-      const video = element instanceof HTMLVideoElement ? element : element.querySelector('video')!;
+      const mediaEl = isAudio
+        ? (element as HTMLAudioElement)
+        : (element instanceof HTMLVideoElement ? element : element.querySelector('video')!);
       const cleanup = (): void => {
         element.remove();
         ws.send(JSON.stringify({ type: 'playback_ended', id }));
       };
-      video.addEventListener('ended', cleanup, { once: true });
-      video.addEventListener('error', cleanup, { once: true });
+      mediaEl.addEventListener('ended', cleanup, { once: true });
+      mediaEl.addEventListener('error', cleanup, { once: true });
       return;
     }
 
     if (msg.type === 'play_music') {
-      const { url, title, artist, coverUrl, duration, scale = 1 } = msg as PlayMusicMessage;
-      const { element, audio } = createMusicPlayer(url, title, artist, coverUrl, scale);
+      const { url, title, artist, coverUrl, duration, scale = 1, showPlayer = true } = msg as PlayMusicMessage;
+      const { element, audio } = createMusicPlayer(url, title, artist, coverUrl, scale, showPlayer);
       document.body.appendChild(element);
 
       requestAnimationFrame(() => {

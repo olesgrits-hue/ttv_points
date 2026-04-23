@@ -1,6 +1,6 @@
 import { Config } from './types';
 
-export const KEYTAR_SERVICE = 'twitch-helper';
+export const KEYTAR_SERVICE = 'ttweaks';
 export const KEYTAR_ACCOUNT_ACCESS = 'access_token';
 export const KEYTAR_ACCOUNT_REFRESH = 'refresh_token';
 export const KEYTAR_ACCOUNT_YAM = 'yandex_token';
