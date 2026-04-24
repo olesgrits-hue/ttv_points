@@ -3,8 +3,8 @@ import type { LogEntry, Slot, SlotGroup } from '../main/store/types';
 export interface RewardInfo { rewardId: string; rewardTitle: string; }
 
 export interface QueueItemState {
-  current: { rewardTitle: string; userDisplayName: string } | null;
-  pending: Array<{ rewardTitle: string; userDisplayName: string }>;
+  current: { rewardTitle: string; userDisplayName: string; userInput?: string } | null;
+  pending: Array<{ rewardTitle: string; userDisplayName: string; userInput?: string }>;
 }
 
 export interface ElectronAPI {

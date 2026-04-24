@@ -257,7 +257,7 @@ export function MainScreen(): React.ReactElement {
               {queueState.media.current ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                   <span style={{ color: T.accent, fontSize: '0.78em' }}>▶</span>
-                  <span style={{ fontSize: '0.82em' }}>{queueState.media.current.userDisplayName} — {queueState.media.current.rewardTitle}</span>
+                  <span style={{ fontSize: '0.82em' }}>{queueState.media.current.userDisplayName} — {queueState.media.current.userInput ?? queueState.media.current.rewardTitle}</span>
                   <button onClick={() => void window.electronAPI.queueSkip()} style={{ fontSize: '0.72em', marginLeft: 'auto' }}>skip</button>
                 </div>
               ) : (
@@ -265,7 +265,7 @@ export function MainScreen(): React.ReactElement {
               )}
               {queueState.media.pending.map((item, i) => (
                 <div key={i} style={{ fontSize: '0.78em', color: T.textSoft, paddingLeft: '14px', paddingTop: '2px' }}>
-                  {i + 1}. {item.userDisplayName} — {item.rewardTitle}
+                  {i + 1}. {item.userDisplayName} — {item.userInput ?? item.rewardTitle}
                 </div>
               ))}
             </div>
@@ -281,7 +281,7 @@ export function MainScreen(): React.ReactElement {
               {queueState.music.current ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                   <span style={{ color: T.purple, fontSize: '0.78em' }}>♪</span>
-                  <span style={{ fontSize: '0.82em' }}>{queueState.music.current.userDisplayName} — {queueState.music.current.rewardTitle}</span>
+                  <span style={{ fontSize: '0.82em' }}>{queueState.music.current.userDisplayName} — {queueState.music.current.userInput ?? queueState.music.current.rewardTitle}</span>
                   <button onClick={() => void window.electronAPI.queueSkip()} style={{ fontSize: '0.72em', marginLeft: 'auto' }}>skip</button>
                 </div>
               ) : (
@@ -289,7 +289,7 @@ export function MainScreen(): React.ReactElement {
               )}
               {queueState.music.pending.map((item, i) => (
                 <div key={i} style={{ fontSize: '0.78em', color: T.textSoft, paddingLeft: '14px', paddingTop: '2px' }}>
-                  {i + 1}. {item.userDisplayName} — {item.rewardTitle}
+                  {i + 1}. {item.userDisplayName} — {item.userInput ?? item.rewardTitle}
                 </div>
               ))}
             </div>

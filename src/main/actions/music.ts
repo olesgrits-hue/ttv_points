@@ -65,8 +65,16 @@ export class MusicAction {
         groupId,
       );
 
-      // 30s gap between tracks so they don't overlap in queue
-      await new Promise<void>((resolve) => setTimeout(resolve, 30_000));
+      // 30s gap between tracks so they don't overlap in queue.
+      // Resolves early if skip is requested.
+      await new Promise<void>((resolve) => {
+        const onSkip = (): void => { clearTimeout(timer); resolve(); };
+        const timer = setTimeout(() => {
+          this.overlayServer.removeListener('skip', onSkip);
+          resolve();
+        }, 30_000);
+        this.overlayServer.once('skip', onSkip);
+      });
 
       await this.twitchApi.fulfillRedemption(redemption.rewardId, redemption.id);
       success = true;

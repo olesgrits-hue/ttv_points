@@ -32,9 +32,12 @@ function getAudioGraph(): { ctx: AudioContext; compressor: DynamicsCompressorNod
 function connectToCompressor(el: HTMLMediaElement): void {
   try {
     const { ctx, compressor } = getAudioGraph();
+    // Resume unconditionally — OBS Browser Source suspends AudioContext on load.
+    // Must resume before connecting: createMediaElementSource detaches element
+    // from default audio output, so a suspended context = silence.
+    void ctx.resume();
     const source = ctx.createMediaElementSource(el);
     source.connect(compressor);
-    if (ctx.state === 'suspended') void ctx.resume();
   } catch { /* element may already be connected */ }
 }
 
@@ -44,6 +47,18 @@ document.addEventListener('visibilitychange', () => {
     void _audioCtx.resume();
   }
 });
+
+// Registered stop-immediately callbacks for all active playbacks.
+// Called when the server sends a 'stop' message (skip).
+const _activeStoppers: Array<() => void> = [];
+
+function registerStopper(fn: () => void): () => void {
+  _activeStoppers.push(fn);
+  return (): void => {
+    const idx = _activeStoppers.indexOf(fn);
+    if (idx >= 0) _activeStoppers.splice(idx, 1);
+  };
+}
 
 function getGroupId(): string {
   const w = window as Window & { __GROUP_ID__?: string };
@@ -239,6 +254,10 @@ interface PlayMusicMessage {
   showPlayer?: boolean;
 }
 
+interface StopMessage {
+  type: 'stop';
+}
+
 function connect(): void {
   const groupId = getGroupId();
   const ws = new WebSocket(WS_URL);
@@ -248,9 +267,9 @@ function connect(): void {
   });
 
   ws.addEventListener('message', (event: MessageEvent) => {
-    let msg: PlayMessage | PlayMusicMessage;
+    let msg: PlayMessage | PlayMusicMessage | StopMessage;
     try {
-      msg = JSON.parse(event.data as string) as PlayMessage | PlayMusicMessage;
+      msg = JSON.parse(event.data as string) as PlayMessage | PlayMusicMessage | StopMessage;
     } catch {
       return;
     }
@@ -263,10 +282,16 @@ function connect(): void {
       const mediaEl = isAudio
         ? (element as HTMLAudioElement)
         : (element instanceof HTMLVideoElement ? element : element.querySelector('video')!);
+      let done = false;
       const cleanup = (): void => {
+        if (done) return;
+        done = true;
+        unregister();
+        (mediaEl as HTMLVideoElement | HTMLAudioElement).pause?.();
         element.remove();
         ws.send(JSON.stringify({ type: 'playback_ended', id }));
       };
+      const unregister = registerStopper(cleanup);
       mediaEl.addEventListener('ended', cleanup, { once: true });
       mediaEl.addEventListener('error', cleanup, { once: true });
       return;
@@ -287,6 +312,7 @@ function connect(): void {
       const finish = (): void => {
         if (finished) return;
         finished = true;
+        unregister();
         (element as (HTMLElement & { _stopEq?: () => void }))._stopEq?.();
         (element as HTMLElement).style.transform = 'translateX(-50%) translateY(120%)';
         setTimeout(() => {
@@ -295,9 +321,25 @@ function connect(): void {
         }, 500);
       };
 
+      // Force-stop (skip): stop audio immediately, no slide-out animation.
+      const stopNow = (): void => {
+        if (finished) return;
+        finished = true;
+        audio.pause();
+        (element as (HTMLElement & { _stopEq?: () => void }))._stopEq?.();
+        element.remove();
+        ws.send(JSON.stringify({ type: 'playback_ended' }));
+      };
+      const unregister = registerStopper(stopNow);
+
       audio.addEventListener('ended', finish, { once: true });
       audio.addEventListener('error', finish, { once: true });
       setTimeout(finish, (duration + 10) * 1000);
+    }
+
+    if (msg.type === 'stop') {
+      const stoppers = _activeStoppers.splice(0);
+      for (const fn of stoppers) fn();
     }
   });
 

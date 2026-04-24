@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import * as http from 'http';
 import * as path from 'path';
@@ -30,7 +31,7 @@ interface PendingPlayback {
  * Each group gets its own overlay URL: /overlay/:groupId
  * WS clients register their groupId by sending { type: 'register', groupId }.
  */
-export class OverlayServer {
+export class OverlayServer extends EventEmitter {
   readonly registry = new MediaRegistry();
   private readonly app: Express;
   private readonly httpServer: http.Server;
@@ -43,6 +44,7 @@ export class OverlayServer {
     private readonly overlayHtmlPath: string = path.resolve(__dirname, '../../web/overlay/index.html'),
     private readonly webDir: string = path.resolve(__dirname, '../../web'),
   ) {
+    super();
     this.app = express();
     this.configureRoutes();
     this.httpServer = http.createServer(this.app);
@@ -161,13 +163,22 @@ export class OverlayServer {
     });
   }
 
-  /** Immediately resolve all pending playbacks (used for skip). */
+  /** Immediately resolve all pending playbacks and stop overlay playback (used for skip). */
   skipAll(): void {
     for (const [groupId, pending] of this.pendingPlaybacks) {
       clearTimeout(pending.timer);
       this.pendingPlaybacks.delete(groupId);
       pending.resolve();
     }
+    // Tell all overlay clients to stop immediately.
+    const stopMsg = JSON.stringify({ type: 'stop' });
+    for (const client of this.wss.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        try { client.send(stopMsg); } catch { /* ignore */ }
+      }
+    }
+    // Signal pending 30s gaps in MusicAction to resolve early.
+    this.emit('skip');
   }
 
   // --- Internal ---------------------------------------------------------
