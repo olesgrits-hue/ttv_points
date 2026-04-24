@@ -30,15 +30,19 @@ function getAudioGraph(): { ctx: AudioContext; compressor: DynamicsCompressorNod
 }
 
 function connectToCompressor(el: HTMLMediaElement): void {
-  try {
-    const { ctx, compressor } = getAudioGraph();
-    // Resume unconditionally — OBS Browser Source suspends AudioContext on load.
-    // Must resume before connecting: createMediaElementSource detaches element
-    // from default audio output, so a suspended context = silence.
-    void ctx.resume();
-    const source = ctx.createMediaElementSource(el);
-    source.connect(compressor);
-  } catch { /* element may already be connected */ }
+  const { ctx, compressor } = getAudioGraph();
+  // Don't call createMediaElementSource synchronously — it permanently detaches
+  // the element from default audio output. If AudioContext is suspended (OBS
+  // Browser Source has no user gesture), that means total silence.
+  // Instead: resume first, and only route through compressor if context actually
+  // became running. Otherwise audio keeps playing through default output.
+  void ctx.resume().then(() => {
+    if (ctx.state !== 'running') return;
+    try {
+      const source = ctx.createMediaElementSource(el);
+      source.connect(compressor);
+    } catch { /* already connected */ }
+  });
 }
 
 // Keep AudioContext alive when OBS hides the source (visibilitychange).
