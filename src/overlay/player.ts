@@ -1,7 +1,7 @@
 /**
  * Overlay player — runs in OBS Browser Source (Chromium renderer).
  * Connects to ws://127.0.0.1:7891/ws, registers with __GROUP_ID__,
- * handles 'play' and 'play_music' commands.
+ * handles 'play', 'play_music', and 'stop' commands.
  */
 
 const WS_URL = 'ws://127.0.0.1:7891/ws';
@@ -10,8 +10,7 @@ const MEME_PADDING = 15;
 const MEME_BORDER_RADIUS = 12;
 const MAX_ROTATION_DEG = 15;
 
-// Shared AudioContext + DynamicsCompressor for auto-leveling all media/audio.
-// One context reused for every element to avoid multiple audio graphs.
+// Shared AudioContext + DynamicsCompressor for auto-leveling media/video.
 let _audioCtx: AudioContext | null = null;
 let _compressor: DynamicsCompressorNode | null = null;
 
@@ -31,11 +30,9 @@ function getAudioGraph(): { ctx: AudioContext; compressor: DynamicsCompressorNod
 
 function connectToCompressor(el: HTMLMediaElement): void {
   const { ctx, compressor } = getAudioGraph();
-  // Don't call createMediaElementSource synchronously — it permanently detaches
-  // the element from default audio output. If AudioContext is suspended (OBS
-  // Browser Source has no user gesture), that means total silence.
-  // Instead: resume first, and only route through compressor if context actually
-  // became running. Otherwise audio keeps playing through default output.
+  // Resume first, then connect — only route through compressor once context is
+  // confirmed running. If AudioContext stays suspended (OBS CEF without user
+  // gesture), audio keeps playing natively through default output.
   void ctx.resume().then(() => {
     if (ctx.state !== 'running') return;
     try {
@@ -45,15 +42,14 @@ function connectToCompressor(el: HTMLMediaElement): void {
   });
 }
 
-// Keep AudioContext alive when OBS hides the source (visibilitychange).
+// Keep AudioContext alive when OBS hides the source.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && _audioCtx) {
     void _audioCtx.resume();
   }
 });
 
-// Registered stop-immediately callbacks for all active playbacks.
-// Called when the server sends a 'stop' message (skip).
+// Registered stop-immediately callbacks for all active playbacks (used for skip).
 const _activeStoppers: Array<() => void> = [];
 
 function registerStopper(fn: () => void): () => void {
@@ -155,7 +151,6 @@ function createMusicPlayer(url: string, title: string, artist: string, coverUrl:
     audio.src = url;
     audio.autoplay = true;
     audio.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none;';
-    connectToCompressor(audio);
     return { element: audio, audio };
   }
 
@@ -221,8 +216,10 @@ function createMusicPlayer(url: string, title: string, artist: string, coverUrl:
   const audio = document.createElement('audio');
   audio.src = url;
   audio.autoplay = true;
+  // Music plays natively — do NOT route through AudioContext/compressor.
+  // OBS Browser Source (CEF) captures native <audio> output reliably;
+  // Web Audio API createMediaElementSource causes silence in CEF without user gesture.
   wrap.appendChild(audio);
-  connectToCompressor(audio);
 
   if (!document.getElementById('vinyl-spin-style')) {
     const style = document.createElement('style');
@@ -325,7 +322,6 @@ function connect(): void {
         }, 500);
       };
 
-      // Force-stop (skip): stop audio immediately, no slide-out animation.
       const stopNow = (): void => {
         if (finished) return;
         finished = true;
@@ -339,6 +335,7 @@ function connect(): void {
       audio.addEventListener('ended', finish, { once: true });
       audio.addEventListener('error', finish, { once: true });
       setTimeout(finish, (duration + 10) * 1000);
+      return;
     }
 
     if (msg.type === 'stop') {

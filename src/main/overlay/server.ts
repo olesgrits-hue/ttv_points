@@ -36,7 +36,7 @@ export class OverlayServer extends EventEmitter {
   private readonly app: Express;
   private readonly httpServer: http.Server;
   private readonly wss: WebSocketServer;
-  private readonly groupClients = new Map<string, WebSocket>();
+  private readonly groupClients = new Map<string, Set<WebSocket>>();
   private readonly pendingPlaybacks = new Map<string, PendingPlayback>();
   private started = false;
 
@@ -101,16 +101,30 @@ export class OverlayServer extends EventEmitter {
     return { address: addr.address, port: addr.port };
   }
 
-  /** Push a play command to the group overlay and wait for playback_ended or timeout. */
+  /** Broadcast a message to all connected clients of a group. Returns count sent. */
+  private broadcast(groupId: string, data: string): number {
+    const clients = this.groupClients.get(groupId);
+    if (!clients) return 0;
+    let sent = 0;
+    for (const ws of clients) {
+      if (ws.readyState === WebSocket.OPEN) {
+        try { ws.send(data); sent++; } catch { /* ignore */ }
+      }
+    }
+    return sent;
+  }
+
+  /** Push a play command to all overlay clients in the group and wait for playback_ended or timeout. */
   play(id: string, _filePath: string, scale = 3, isMeme = false, groupId = 'default', isAudio = false, width?: number, height?: number): Promise<void> {
     if (this.pendingPlaybacks.has(groupId)) {
       return Promise.reject(new Error(`OverlayServer.play: another playback is in progress for group ${groupId}`));
     }
-    const socket = this.groupClients.get(groupId);
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
+    const clients = this.groupClients.get(groupId);
+    if (!clients || clients.size === 0) {
       return Promise.reject(new Error(`OverlayServer.play: no connected overlay for group "${groupId}"`));
     }
     const msg: PlayMessage = { type: 'play', id, url: `/media/${id}`, scale, isMeme, isAudio, width, height };
+    const data = JSON.stringify(msg);
 
     return new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
@@ -120,9 +134,7 @@ export class OverlayServer extends EventEmitter {
 
       this.pendingPlaybacks.set(groupId, { resolve, timer });
 
-      try {
-        socket.send(JSON.stringify(msg));
-      } catch {
+      if (this.broadcast(groupId, data) === 0) {
         clearTimeout(timer);
         this.pendingPlaybacks.delete(groupId);
         resolve();
@@ -130,20 +142,20 @@ export class OverlayServer extends EventEmitter {
     });
   }
 
-  /** Push a music play command to the group overlay. */
+  /** Push a music play command to all overlay clients in the group. */
   playMusic(payload: Omit<PlayMusicMessage, 'type'>, groupId = 'default'): Promise<void> {
     if (this.pendingPlaybacks.has(groupId)) {
       return Promise.reject(new Error(`OverlayServer.playMusic: another playback is in progress for group ${groupId}`));
     }
-    const socket = this.groupClients.get(groupId);
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
+    const clients = this.groupClients.get(groupId);
+    if (!clients || clients.size === 0) {
       return Promise.reject(new Error(`OverlayServer.playMusic: no connected overlay for group "${groupId}"`));
     }
     const msg: PlayMusicMessage = { ...payload, type: 'play_music', showPlayer: payload.showPlayer ?? true };
-    // Use actual track duration + 30s gap + 15s buffer as timeout
     const timeoutMs = payload.duration > 0
       ? (payload.duration + 45) * 1000
       : PLAYBACK_TIMEOUT_MS;
+    const data = JSON.stringify(msg);
 
     return new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
@@ -153,9 +165,7 @@ export class OverlayServer extends EventEmitter {
 
       this.pendingPlaybacks.set(groupId, { resolve, timer });
 
-      try {
-        socket.send(JSON.stringify(msg));
-      } catch {
+      if (this.broadcast(groupId, data) === 0) {
         clearTimeout(timer);
         this.pendingPlaybacks.delete(groupId);
         resolve();
@@ -255,13 +265,11 @@ export class OverlayServer extends EventEmitter {
         const { groupId } = msg as RegisterMessage;
         if (typeof groupId !== 'string' || !groupId) return;
 
-        // Replace any existing connection for this group.
-        const existing = this.groupClients.get(groupId);
-        if (existing && existing !== ws) {
-          try { existing.close(1000, 'replaced'); } catch { /* ignore */ }
-        }
+        // Add this socket to the group's client set (multiple clients per group allowed).
+        let set = this.groupClients.get(groupId);
+        if (!set) { set = new Set(); this.groupClients.set(groupId, set); }
+        set.add(ws);
         client.groupId = groupId;
-        this.groupClients.set(groupId, ws);
         return;
       }
 
@@ -278,8 +286,12 @@ export class OverlayServer extends EventEmitter {
     });
 
     ws.on('close', () => {
-      if (client.groupId && this.groupClients.get(client.groupId) === ws) {
-        this.groupClients.delete(client.groupId);
+      if (client.groupId) {
+        const set = this.groupClients.get(client.groupId);
+        if (set) {
+          set.delete(ws);
+          if (set.size === 0) this.groupClients.delete(client.groupId);
+        }
       }
     });
 

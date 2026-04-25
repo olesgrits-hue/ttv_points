@@ -407,7 +407,7 @@ export function MainScreen(): React.ReactElement {
         {tab === 'about' && (
           <section style={sectionStyle}>
             <div style={{ color: T.accent, fontSize: '1em', letterSpacing: '0.15em', marginBottom: '16px' }}>
-              TTWeaks v1.1.0
+              TTWeaks v1.1.2
             </div>
             <div style={{ color: T.textSoft, fontSize: '0.85em', lineHeight: '1.8', marginBottom: '20px' }}>
               Портативный оверлей для OBS.<br />
