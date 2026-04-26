@@ -7,7 +7,7 @@ import { TWITCH_CLIENT_ID as BUNDLED_CLIENT_ID, TWITCH_CLIENT_SECRET as BUNDLED_
 
 const TWITCH_AUTH_BASE = 'https://id.twitch.tv/oauth2';
 const TWITCH_API_BASE = 'https://api.twitch.tv/helix';
-const SCOPES = 'channel:read:redemptions channel:manage:redemptions';
+const SCOPES = 'channel:read:redemptions channel:manage:redemptions moderator:read:followers';
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1_000; // 5 minutes
 const OAUTH_CALLBACK_PORT = 7892;
 const OAUTH_REDIRECT_URI = `http://localhost:${OAUTH_CALLBACK_PORT}/callback`;
@@ -172,6 +172,7 @@ export class TwitchAuth {
         authUrl.searchParams.set('state', state);
         authUrl.searchParams.set('code_challenge', code_challenge);
         authUrl.searchParams.set('code_challenge_method', 'S256');
+        authUrl.searchParams.set('force_verify', 'true');
 
         shell.openExternal(authUrl.toString()).catch(reject);
       });
@@ -231,6 +232,7 @@ export class TwitchAuth {
       if (user) {
         update.userId = user.id;
         update.broadcasterId = user.id;
+        update.userLogin = user.login;
       }
     }
 

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Config, DEFAULT_CONFIG } from './types';
+import { AlertConfig, Config, DEFAULT_ALERT_CONFIG, DEFAULT_CONFIG } from './types';
 
 const CONFIG_FILENAME = 'config.json';
 
@@ -109,9 +109,23 @@ function normalize(parsed: Partial<Config>): Config {
     userId: typeof parsed.userId === 'string' ? parsed.userId : undefined,
     broadcasterId:
       typeof parsed.broadcasterId === 'string' ? parsed.broadcasterId : undefined,
+    userLogin: typeof parsed.userLogin === 'string' ? parsed.userLogin : undefined,
     tokenExpiresAt:
       typeof parsed.tokenExpiresAt === 'string' ? parsed.tokenExpiresAt : undefined,
     onboardingDone: parsed.onboardingDone === true ? true : undefined,
+    alertConfig: normalizeAlertConfig(parsed.alertConfig),
+  };
+}
+
+function normalizeAlertConfig(raw: unknown): AlertConfig | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Partial<AlertConfig>;
+  return {
+    enabled: r.enabled !== false,
+    subtitleText: typeof r.subtitleText === 'string' ? r.subtitleText : DEFAULT_ALERT_CONFIG.subtitleText,
+    nickColor: typeof r.nickColor === 'string' ? r.nickColor : DEFAULT_ALERT_CONFIG.nickColor,
+    nickFontSize: typeof r.nickFontSize === 'number' ? r.nickFontSize : DEFAULT_ALERT_CONFIG.nickFontSize,
+    animationSpeed: typeof r.animationSpeed === 'number' ? r.animationSpeed : DEFAULT_ALERT_CONFIG.animationSpeed,
   };
 }
 

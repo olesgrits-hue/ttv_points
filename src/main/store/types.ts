@@ -39,6 +39,22 @@ export interface MusicSlot extends BaseSlot {
 
 export type Slot = MediaSlot | MemeSlot | MusicSlot;
 
+export interface AlertConfig {
+  enabled: boolean;
+  subtitleText: string;
+  nickColor: string;
+  nickFontSize: number;
+  animationSpeed: number;
+}
+
+export const DEFAULT_ALERT_CONFIG: AlertConfig = {
+  enabled: true,
+  subtitleText: 'десантировался на канал',
+  nickColor: '#ff2e7e',
+  nickFontSize: 52,
+  animationSpeed: 1.0,
+};
+
 export interface Config {
   slots: Slot[];
   groups: SlotGroup[];
@@ -46,8 +62,10 @@ export interface Config {
   clientSecret?: string;
   userId?: string;
   broadcasterId?: string;
+  userLogin?: string;
   tokenExpiresAt?: string;
   onboardingDone?: boolean;
+  alertConfig?: AlertConfig;
 }
 
 export interface LogEntry {

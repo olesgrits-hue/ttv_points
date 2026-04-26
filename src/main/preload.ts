@@ -33,9 +33,18 @@ export interface QueueItemState {
   pending: Array<{ rewardTitle: string; userDisplayName: string; userInput?: string }>;
 }
 
+export interface AlertConfig {
+  enabled: boolean;
+  subtitleText: string;
+  nickColor: string;
+  nickFontSize: number;
+  animationSpeed: number;
+}
+
 export interface ElectronAPI {
   login: () => Promise<void>;
   checkAuth: () => Promise<boolean>;
+  getUser: () => Promise<{ userLogin: string | null }>;
   onAuthLogout: (cb: () => void) => () => void;
   onTwitchStatus: (cb: (payload: { connected: boolean }) => void) => () => void;
   onLogEntry: (cb: (entry: LogEntry) => void) => () => void;
@@ -69,6 +78,10 @@ export interface ElectronAPI {
   queueClearMedia: () => Promise<void>;
   queueClearMusic: () => Promise<void>;
   onQueueState: (cb: (state: { media: QueueItemState; music: QueueItemState }) => void) => () => void;
+  // Follower Alerts
+  alertGetConfig: () => Promise<AlertConfig>;
+  alertSetConfig: (config: AlertConfig) => Promise<void>;
+  alertTrigger: (nick: string) => Promise<void>;
   // Onboarding
   onboardingCheck: () => Promise<boolean>;
   onboardingComplete: () => Promise<void>;
@@ -82,6 +95,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   login: (): Promise<void> => ipcRenderer.invoke('auth:login'),
 
   checkAuth: (): Promise<boolean> => ipcRenderer.invoke('auth:check'),
+  getUser: (): Promise<{ userLogin: string | null }> => ipcRenderer.invoke('auth:getUser'),
 
   onAuthLogout: (cb: () => void): (() => void) => {
     const listener = (): void => cb();
@@ -139,6 +153,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('queue:state', listener);
     return (): void => { ipcRenderer.removeListener('queue:state', listener); };
   },
+
+  alertGetConfig: () => ipcRenderer.invoke('alert:getConfig'),
+  alertSetConfig: (config: AlertConfig) => ipcRenderer.invoke('alert:setConfig', config),
+  alertTrigger: (nick: string) => ipcRenderer.invoke('alert:trigger', nick),
 
   onboardingCheck: () => ipcRenderer.invoke('onboarding:check'),
   onboardingComplete: () => ipcRenderer.invoke('onboarding:complete'),

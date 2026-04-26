@@ -20,8 +20,10 @@ import { registerSlotIpcHandlers } from './ipc/slots';
 import { registerGroupIpcHandlers } from './ipc/groups';
 import { registerSettingsIpcHandlers } from './ipc/settings';
 import { registerQueueIpcHandlers } from './ipc/queue';
+import { registerAlertIpcHandlers } from './ipc/alert';
 import { setupAutoUpdater } from './updater';
 import { GroupService } from './slots/group-service';
+import { alertLogger } from './alert-logger';
 
 // ---- Singletons (created exactly once) ----------------------------------------
 
@@ -51,12 +53,15 @@ const musicQueue = new Queue(configStore, twitchClient, twitchApi);
 // ---- App lifecycle ------------------------------------------------------------
 
 app.whenReady().then(async () => {
+  alertLogger.init(app.isPackaged);
+
   // Register all IPC handlers before creating the window
   registerAuthIpcHandlers(twitchAuth, authStore, configStore);
   registerSlotIpcHandlers(slotService, twitchApi);
   registerGroupIpcHandlers(groupService);
   registerSettingsIpcHandlers(authStore, configStore);
   registerQueueIpcHandlers(mediaQueue, musicQueue, overlayServer);
+  registerAlertIpcHandlers(configStore, overlayServer);
 
   const win = createWindow();
 
@@ -69,6 +74,17 @@ app.whenReady().then(async () => {
   // Start Twitch connection + check auth on startup
   await checkAuthOnStartup(twitchAuth, authStore, configStore);
   twitchClient.start();
+
+  // Follow events → trigger alert overlay if alerts are enabled.
+  twitchClient.on('follow', (ev: { userDisplayName: string; userLogin: string }) => {
+    const alertConfig = configStore.read().alertConfig;
+    const enabled = alertConfig?.enabled !== false;
+    alertLogger.log('follow', 'Follow event received from TwitchClient', { user: ev.userDisplayName, enabled });
+    if (enabled) {
+      overlayServer.fireAlert(ev.userDisplayName);
+      alertLogger.log('follow', 'fireAlert called', { user: ev.userDisplayName });
+    }
+  });
 
   // Route redemptions: music goes to musicQueue (parallel), media/meme to mediaQueue (serial)
   twitchClient.on('redemption', (ev) => {

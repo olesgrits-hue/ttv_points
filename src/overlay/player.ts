@@ -10,45 +10,6 @@ const MEME_PADDING = 15;
 const MEME_BORDER_RADIUS = 12;
 const MAX_ROTATION_DEG = 15;
 
-// Shared AudioContext + DynamicsCompressor for auto-leveling media/video.
-let _audioCtx: AudioContext | null = null;
-let _compressor: DynamicsCompressorNode | null = null;
-
-function getAudioGraph(): { ctx: AudioContext; compressor: DynamicsCompressorNode } {
-  if (!_audioCtx || _audioCtx.state === 'closed') {
-    _audioCtx = new AudioContext();
-    _compressor = _audioCtx.createDynamicsCompressor();
-    _compressor.threshold.value = -24;
-    _compressor.knee.value = 30;
-    _compressor.ratio.value = 12;
-    _compressor.attack.value = 0.003;
-    _compressor.release.value = 0.25;
-    _compressor.connect(_audioCtx.destination);
-  }
-  return { ctx: _audioCtx, compressor: _compressor! };
-}
-
-function connectToCompressor(el: HTMLMediaElement): void {
-  const { ctx, compressor } = getAudioGraph();
-  // Resume first, then connect — only route through compressor once context is
-  // confirmed running. If AudioContext stays suspended (OBS CEF without user
-  // gesture), audio keeps playing natively through default output.
-  void ctx.resume().then(() => {
-    if (ctx.state !== 'running') return;
-    try {
-      const source = ctx.createMediaElementSource(el);
-      source.connect(compressor);
-    } catch { /* already connected */ }
-  });
-}
-
-// Keep AudioContext alive when OBS hides the source.
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && _audioCtx) {
-    void _audioCtx.resume();
-  }
-});
-
 // Registered stop-immediately callbacks for all active playbacks (used for skip).
 const _activeStoppers: Array<() => void> = [];
 
@@ -77,7 +38,6 @@ function createMediaElement(url: string, scale: number, isMeme: boolean, isAudio
     audio.src = url;
     audio.autoplay = true;
     audio.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none;';
-    connectToCompressor(audio);
     return audio;
   }
 
@@ -89,7 +49,6 @@ function createMediaElement(url: string, scale: number, isMeme: boolean, isAudio
   video.muted = false;
   video.style.display = 'block';
   video.style.pointerEvents = 'none';
-  connectToCompressor(video);
 
   let container: HTMLElement;
 
@@ -107,8 +66,10 @@ function createMediaElement(url: string, scale: number, isMeme: boolean, isAudio
     video.addEventListener('loadedmetadata', () => {
       const longSide = BASE_LONG_SIDE * scale;
       const ratio = video.videoWidth / video.videoHeight;
-      const vw = fixedWidth ?? (ratio >= 1 ? longSide : Math.round(longSide * ratio));
-      const vh = fixedHeight ?? (ratio >= 1 ? Math.round(longSide / ratio) : longSide);
+      // Meme stickers always use scale-based sizing — fixed overlay dimensions
+      // are for full-screen media slots and would stretch the white card.
+      const vw = ratio >= 1 ? longSide : Math.round(longSide * ratio);
+      const vh = ratio >= 1 ? Math.round(longSide / ratio) : longSide;
       video.style.width = `${vw}px`;
       video.style.height = `${vh}px`;
       container.style.padding = `${MEME_PADDING}px`;
@@ -216,9 +177,6 @@ function createMusicPlayer(url: string, title: string, artist: string, coverUrl:
   const audio = document.createElement('audio');
   audio.src = url;
   audio.autoplay = true;
-  // Music plays natively — do NOT route through AudioContext/compressor.
-  // OBS Browser Source (CEF) captures native <audio> output reliably;
-  // Web Audio API createMediaElementSource causes silence in CEF without user gesture.
   wrap.appendChild(audio);
 
   if (!document.getElementById('vinyl-spin-style')) {

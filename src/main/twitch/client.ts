@@ -41,6 +41,10 @@ export class TwitchClient extends EventEmitter {
     this.eventSub.on('redemption', (ev: RedemptionEvent) => {
       this.emit('redemption', ev);
     });
+
+    this.eventSub.on('follow', (ev: { userId: string; userLogin: string; userDisplayName: string; followedAt: string }) => {
+      this.emit('follow', ev);
+    });
   }
 
   get connected(): boolean {

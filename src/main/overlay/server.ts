@@ -5,10 +5,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { WebSocketServer, WebSocket } from 'ws';
 import { MediaRegistry } from './registry';
+import { alertLogger } from '../alert-logger';
 
 const HOST = '127.0.0.1';
 const PORT = 7891;
 const PLAYBACK_TIMEOUT_MS = 120_000;
+const ALERT_GROUP_ID = '__alert__';
 
 type PlaybackEndedMessage = { type: 'playback_ended'; id?: string };
 type PlayMessage = { type: 'play'; id: string; url: string; scale: number; isMeme: boolean; isAudio: boolean; width?: number; height?: number };
@@ -43,6 +45,7 @@ export class OverlayServer extends EventEmitter {
   constructor(
     private readonly overlayHtmlPath: string = path.resolve(__dirname, '../../web/overlay/index.html'),
     private readonly webDir: string = path.resolve(__dirname, '../../web'),
+    private readonly alertHtmlPath: string = path.resolve(__dirname, '../../web/overlay/alert/index.html'),
   ) {
     super();
     this.app = express();
@@ -173,6 +176,22 @@ export class OverlayServer extends EventEmitter {
     });
   }
 
+  /** Send a fire_alert message to all connected alert overlay clients. */
+  fireAlert(nick: string): void {
+    const clients = this.groupClients.get(ALERT_GROUP_ID);
+    const clientCount = clients?.size ?? 0;
+    alertLogger.log('ws', 'fireAlert called', { nick, alertClients: clientCount });
+    const msg = JSON.stringify({ type: 'fire_alert', nick });
+    const sent = this.broadcast(ALERT_GROUP_ID, msg);
+    alertLogger.log('ws', 'fireAlert broadcast result', { sent });
+  }
+
+  /** Push updated alert config to all connected alert overlay clients. */
+  pushAlertConfig(config: object): void {
+    const msg = JSON.stringify({ type: 'alert_config', config });
+    this.broadcast(ALERT_GROUP_ID, msg);
+  }
+
   /** Immediately resolve all pending playbacks and stop overlay playback (used for skip). */
   skipAll(): void {
     for (const [groupId, pending] of this.pendingPlaybacks) {
@@ -200,6 +219,20 @@ export class OverlayServer extends EventEmitter {
     });
 
     this.app.use('/assets', express.static(path.join(this.webDir, 'assets')));
+
+    // Follower alert overlay — serves alert/index.html with config injection.
+    this.app.get('/overlay/alert', (_req: Request, res: Response) => {
+      this.serveAlertHtml(res);
+    });
+
+    // Alert overlay JS engine — served as a static asset.
+    this.app.get('/overlay/alert/alert-engine.js', (_req: Request, res: Response) => {
+      const jsPath = path.join(path.dirname(this.alertHtmlPath), 'alert-engine.js');
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      res.sendFile(path.resolve(jsPath), (err) => {
+        if (err && !res.headersSent) res.status(404).end();
+      });
+    });
 
     // Per-group overlay page — injects __GROUP_ID__ for WS registration.
     this.app.get('/overlay/:groupId', (req: Request, res: Response) => {
@@ -232,6 +265,23 @@ export class OverlayServer extends EventEmitter {
           res.status(404).end();
         }
       });
+    });
+  }
+
+  private serveAlertHtml(res: Response): void {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    fs.readFile(this.alertHtmlPath, 'utf-8', (err, html) => {
+      if (err) {
+        res.status(500).send('Alert HTML not found');
+        return;
+      }
+      // Inject <base> so relative paths (./alert-engine.js) resolve correctly
+      // when the page is served at /overlay/alert (no trailing slash).
+      const injected = html.replace(
+        '<head>',
+        '<head><base href="/overlay/alert/">',
+      );
+      res.status(200).send(injected);
     });
   }
 
@@ -270,6 +320,9 @@ export class OverlayServer extends EventEmitter {
         if (!set) { set = new Set(); this.groupClients.set(groupId, set); }
         set.add(ws);
         client.groupId = groupId;
+        if (groupId === ALERT_GROUP_ID) {
+          alertLogger.log('ws', 'alert client registered', { totalAlertClients: set.size });
+        }
         return;
       }
 
@@ -290,6 +343,9 @@ export class OverlayServer extends EventEmitter {
         const set = this.groupClients.get(client.groupId);
         if (set) {
           set.delete(ws);
+          if (client.groupId === ALERT_GROUP_ID) {
+            alertLogger.log('ws', 'alert client disconnected', { remainingAlertClients: set.size });
+          }
           if (set.size === 0) this.groupClients.delete(client.groupId);
         }
       }

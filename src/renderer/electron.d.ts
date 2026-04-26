@@ -2,6 +2,14 @@ import type { LogEntry, Slot, SlotGroup } from '../main/store/types';
 
 export interface RewardInfo { rewardId: string; rewardTitle: string; }
 
+export interface AlertConfig {
+  enabled: boolean;
+  subtitleText: string;
+  nickColor: string;
+  nickFontSize: number;
+  animationSpeed: number;
+}
+
 export interface QueueItemState {
   current: { rewardTitle: string; userDisplayName: string; userInput?: string } | null;
   pending: Array<{ rewardTitle: string; userDisplayName: string; userInput?: string }>;
@@ -10,6 +18,7 @@ export interface QueueItemState {
 export interface ElectronAPI {
   login: () => Promise<void>;
   checkAuth: () => Promise<boolean>;
+  getUser: () => Promise<{ userLogin: string | null }>;
   onAuthLogout: (cb: () => void) => () => void;
   onTwitchStatus: (cb: (payload: { connected: boolean }) => void) => () => void;
   onLogEntry: (cb: (entry: LogEntry) => void) => () => void;
@@ -43,6 +52,10 @@ export interface ElectronAPI {
   queueClearMedia: () => Promise<void>;
   queueClearMusic: () => Promise<void>;
   onQueueState: (cb: (state: { media: QueueItemState; music: QueueItemState }) => void) => () => void;
+  // Follower Alerts
+  alertGetConfig: () => Promise<AlertConfig>;
+  alertSetConfig: (config: AlertConfig) => Promise<void>;
+  alertTrigger: (nick: string) => Promise<void>;
   // Onboarding
   onboardingCheck: () => Promise<boolean>;
   onboardingComplete: () => Promise<void>;

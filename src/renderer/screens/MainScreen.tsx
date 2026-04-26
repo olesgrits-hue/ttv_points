@@ -3,7 +3,7 @@ import { EventLog } from '../components/EventLog';
 import { SlotCard } from '../components/SlotCard';
 import { SlotForm } from '../components/SlotForm';
 import type { LogEntry, Slot, SlotGroup } from '../../main/store/types';
-import type { QueueItemState } from '../electron.d';
+import type { AlertConfig, QueueItemState } from '../electron.d';
 import { T } from '../theme';
 
 const OVERLAY_BASE = 'http://127.0.0.1:7891/overlay';
@@ -11,7 +11,7 @@ const MAX_LOG_ENTRIES = 200;
 const MAX_SLOTS = 5;
 const GITHUB_ISSUES = 'https://github.com/olesgrits-hue/ttv_points/issues/new';
 
-type Tab = 'slots' | 'queue' | 'logs' | 'settings' | 'about';
+type Tab = 'slots' | 'queue' | 'alerts' | 'logs' | 'settings' | 'about';
 
 const sectionStyle: React.CSSProperties = {
   border: `1px solid ${T.border}`,
@@ -40,11 +40,23 @@ export function MainScreen(): React.ReactElement {
     media: emptyQueueState,
     music: emptyQueueState,
   });
+  const [alertConfig, setAlertConfig] = useState<AlertConfig>({
+    enabled: true,
+    subtitleText: 'десантировался на канал',
+    nickColor: '#ff2e7e',
+    nickFontSize: 52,
+    animationSpeed: 1.0,
+  });
+  const [alertTestNick, setAlertTestNick] = useState('TestUser');
+  const [alertSaving, setAlertSaving] = useState(false);
+  const [userLogin, setUserLogin] = useState<string | null>(null);
 
   useEffect(() => {
     window.electronAPI.slotsList().then(setSlots).catch(console.error);
     window.electronAPI.groupsList().then(setGroups).catch(console.error);
     window.electronAPI.settingsGetYamToken().then((t) => { if (t) setYamSaved(true); }).catch(console.error);
+    window.electronAPI.alertGetConfig().then(setAlertConfig).catch(console.error);
+    window.electronAPI.getUser().then(({ userLogin: u }) => setUserLogin(u)).catch(console.error);
 
     window.electronAPI.queueGetState().then(setQueueState).catch(console.error);
 
@@ -116,6 +128,7 @@ export function MainScreen(): React.ReactElement {
   const TABS: { id: Tab; label: string }[] = [
     { id: 'slots', label: 'СЛОТЫ' },
     { id: 'queue', label: 'ОЧЕРЕДЬ' },
+    ...(userLogin === 'scler0ze' ? [{ id: 'alerts' as Tab, label: 'АЛЕРТЫ' }] : []),
     { id: 'logs', label: 'ЛОГИ' },
     { id: 'settings', label: 'НАСТРОЙКИ' },
     { id: 'about', label: 'О ПРОГРАММЕ' },
@@ -134,15 +147,26 @@ export function MainScreen(): React.ReactElement {
         flexShrink: 0,
       }}>
         <span style={{ color: T.accent, fontSize: '0.85em', letterSpacing: '0.15em' }}>TTWeaks</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{
-            width: '7px', height: '7px', borderRadius: '50%',
-            background: connected ? T.accent : T.error,
-            display: 'inline-block',
-          }} />
-          <span style={{ fontSize: '0.75em', color: connected ? T.textSoft : T.error }}>
-            {connected ? 'CONNECTED' : 'RECONNECTING'}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              width: '7px', height: '7px', borderRadius: '50%',
+              background: connected ? T.accent : T.error,
+              display: 'inline-block',
+            }} />
+            <span style={{ fontSize: '0.75em', color: connected ? T.textSoft : T.error }}>
+              {connected ? 'CONNECTED' : 'RECONNECTING'}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              void window.electronAPI.login();
+            }}
+            style={{ fontSize: '0.7em', padding: '2px 8px', color: T.textMuted, borderColor: T.border }}
+            title="Перелогиниться в Twitch (обновить права доступа)"
+          >
+            re-login
+          </button>
         </div>
       </div>
 
@@ -296,6 +320,160 @@ export function MainScreen(): React.ReactElement {
           </section>
         )}
 
+        {/* ── ALERTS TAB ── */}
+        {tab === 'alerts' && (
+          <>
+            {/* Overlay URL */}
+            <section style={sectionStyle}>
+              <div style={{ color: T.accent, fontSize: '0.85em', letterSpacing: '0.1em', marginBottom: '10px' }}>
+                / FOLLOWER ALERT
+              </div>
+              <div style={{ fontSize: '0.8em', color: T.textMuted, marginBottom: '6px' }}>
+                Добавь в OBS как Browser Source (1920×1080):
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <span style={{ fontSize: '0.78em', color: T.textSoft, flex: 1, fontFamily: 'monospace' }}>
+                  http://127.0.0.1:7891/overlay/alert
+                </span>
+                <button
+                  onClick={() => copyUrl('http://127.0.0.1:7891/overlay/alert')}
+                  style={{ fontSize: '0.72em' }}
+                >
+                  копировать
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <label style={{ fontSize: '0.8em', color: T.textSoft, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={alertConfig.enabled}
+                    onChange={(e) => {
+                      const updated = { ...alertConfig, enabled: e.target.checked };
+                      setAlertConfig(updated);
+                      setAlertSaving(true);
+                      window.electronAPI.alertSetConfig(updated)
+                        .then(() => setAlertSaving(false))
+                        .catch(console.error);
+                    }}
+                  />
+                  Включить алерт на фолловеров
+                </label>
+                {alertSaving && <span style={{ fontSize: '0.72em', color: T.textMuted }}>сохраняю...</span>}
+              </div>
+            </section>
+
+            {/* Settings */}
+            <section style={sectionStyle}>
+              <div style={{ color: T.textSoft, fontSize: '0.8em', letterSpacing: '0.05em', marginBottom: '12px' }}>
+                / НАСТРОЙКИ АНИМАЦИИ
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* Subtitle text */}
+                <div>
+                  <div style={{ fontSize: '0.75em', color: T.textMuted, marginBottom: '4px' }}>Текст в бабле</div>
+                  <input
+                    type="text"
+                    value={alertConfig.subtitleText}
+                    onChange={(e) => setAlertConfig({ ...alertConfig, subtitleText: e.target.value })}
+                    onBlur={() => {
+                      setAlertSaving(true);
+                      window.electronAPI.alertSetConfig(alertConfig)
+                        .then(() => setAlertSaving(false))
+                        .catch(console.error);
+                    }}
+                    style={{ width: '100%' }}
+                    placeholder="десантировался на канал"
+                  />
+                </div>
+
+                {/* Nick color */}
+                <div>
+                  <div style={{ fontSize: '0.75em', color: T.textMuted, marginBottom: '4px' }}>Цвет ника</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="color"
+                      value={alertConfig.nickColor}
+                      onChange={(e) => {
+                        const updated = { ...alertConfig, nickColor: e.target.value };
+                        setAlertConfig(updated);
+                        window.electronAPI.alertSetConfig(updated).catch(console.error);
+                      }}
+                      style={{ width: '40px', height: '32px', padding: '2px', border: `1px solid ${T.border}`, background: 'transparent', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.82em', color: T.textSoft, fontFamily: 'monospace' }}>{alertConfig.nickColor}</span>
+                  </div>
+                </div>
+
+                {/* Nick font size */}
+                <div>
+                  <div style={{ fontSize: '0.75em', color: T.textMuted, marginBottom: '4px' }}>
+                    Размер ника: <span style={{ color: T.textSoft }}>{alertConfig.nickFontSize}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={20}
+                    max={80}
+                    step={1}
+                    value={alertConfig.nickFontSize}
+                    onChange={(e) => {
+                      const updated = { ...alertConfig, nickFontSize: Number(e.target.value) };
+                      setAlertConfig(updated);
+                      window.electronAPI.alertSetConfig(updated).catch(console.error);
+                    }}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                {/* Animation speed */}
+                <div>
+                  <div style={{ fontSize: '0.75em', color: T.textMuted, marginBottom: '4px' }}>
+                    Скорость анимации: <span style={{ color: T.textSoft }}>{alertConfig.animationSpeed.toFixed(1)}×</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={2.0}
+                    step={0.1}
+                    value={alertConfig.animationSpeed}
+                    onChange={(e) => {
+                      const updated = { ...alertConfig, animationSpeed: Number(e.target.value) };
+                      setAlertConfig(updated);
+                      window.electronAPI.alertSetConfig(updated).catch(console.error);
+                    }}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* Test trigger */}
+            <section style={sectionStyle}>
+              <div style={{ color: T.textSoft, fontSize: '0.8em', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                / ТЕСТ
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="ник для теста"
+                  value={alertTestNick}
+                  onChange={(e) => setAlertTestNick(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  onClick={() => void window.electronAPI.alertTrigger(alertTestNick || 'TestUser')}
+                  style={{ borderColor: T.accent, color: T.accent }}
+                >
+                  {'> запустить'}
+                </button>
+              </div>
+              <div style={{ fontSize: '0.72em', color: T.textMuted, marginTop: '8px' }}>
+                Алерт появится в OBS Browser Source, добавленном выше.
+              </div>
+            </section>
+          </>
+        )}
+
         {/* ── LOGS TAB ── */}
         {tab === 'logs' && (
           <>
@@ -407,7 +585,7 @@ export function MainScreen(): React.ReactElement {
         {tab === 'about' && (
           <section style={sectionStyle}>
             <div style={{ color: T.accent, fontSize: '1em', letterSpacing: '0.15em', marginBottom: '16px' }}>
-              TTWeaks v1.1.2
+              TTWeaks v1.2.0
             </div>
             <div style={{ color: T.textSoft, fontSize: '0.85em', lineHeight: '1.8', marginBottom: '20px' }}>
               Портативный оверлей для OBS.<br />

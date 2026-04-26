@@ -24,6 +24,11 @@ export function registerAuthIpcHandlers(
     return !authStore.isTokenExpired(cfg);
   });
 
+  ipcMain.handle('auth:getUser', () => {
+    const cfg = configStore.read();
+    return { userLogin: cfg.userLogin ?? null };
+  });
+
   ipcMain.handle('auth:logout', async () => {
     await authStore.deleteTokens();
     const cfg = configStore.read();

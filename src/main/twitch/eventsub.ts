@@ -3,6 +3,7 @@ import WebSocket from 'ws';
 import { AuthStore } from '../store/auth';
 import { ConfigStore } from '../store/config';
 import { TWITCH_CLIENT_ID as BUNDLED_CLIENT_ID } from './twitch-creds';
+import { alertLogger } from '../alert-logger';
 
 const EVENTSUB_URL = 'wss://eventsub.wss.twitch.tv/ws';
 const SUBSCRIPTION_API = 'https://api.twitch.tv/helix/eventsub/subscriptions';
@@ -45,14 +46,8 @@ interface ReconnectPayload {
 interface NotificationPayload {
   metadata: { message_type: 'notification' };
   payload: {
-    event: {
-      id: string;
-      reward: { id: string; title: string };
-      user_id: string;
-      user_name: string;
-      user_login: string;
-      user_input?: string;
-    };
+    subscription: { type: string };
+    event: Record<string, unknown>;
   };
 }
 
@@ -156,20 +151,34 @@ export class EventSubClient extends EventEmitter {
       // No-op: watchdog was already reset by message receipt.
     } else if (type === 'notification') {
       const notif = msg as NotificationPayload;
+      const subscriptionType = notif.payload.subscription?.type ?? '';
       const ev = notif.payload.event;
-      const redemption: RedemptionEvent = {
-        id: ev.id,
-        rewardId: ev.reward.id,
-        rewardTitle: ev.reward.title,
-        userId: ev.user_id,
-        userName: ev.user_name,
-        userLogin: ev.user_login,
-        userDisplayName: ev.user_name,
-        redemptionId: ev.id,
-        redeemedAt: ((ev as Record<string, unknown>)['redeemed_at'] as string | undefined) ?? new Date().toISOString(),
-        userInput: ev.user_input,
-      };
-      this.emit('redemption', redemption);
+
+      alertLogger.log('eventsub', 'notification received', { subscriptionType });
+      if (subscriptionType === 'channel.channel_points_custom_reward_redemption.add') {
+        const redemption: RedemptionEvent = {
+          id: ev['id'] as string,
+          rewardId: (ev['reward'] as { id: string }).id,
+          rewardTitle: (ev['reward'] as { title: string }).title,
+          userId: ev['user_id'] as string,
+          userName: ev['user_name'] as string,
+          userLogin: ev['user_login'] as string,
+          userDisplayName: ev['user_name'] as string,
+          redemptionId: ev['id'] as string,
+          redeemedAt: (ev['redeemed_at'] as string | undefined) ?? new Date().toISOString(),
+          userInput: ev['user_input'] as string | undefined,
+        };
+        this.emit('redemption', redemption);
+      } else if (subscriptionType === 'channel.follow') {
+        const followEvent = {
+          userId: ev['user_id'] as string,
+          userLogin: ev['user_login'] as string,
+          userDisplayName: ev['user_name'] as string,
+          followedAt: (ev['followed_at'] as string | undefined) ?? new Date().toISOString(),
+        };
+        alertLogger.log('eventsub', 'follow event parsed, emitting', followEvent);
+        this.emit('follow', followEvent);
+      }
     }
   }
 
@@ -180,24 +189,52 @@ export class EventSubClient extends EventEmitter {
     const accessToken = tokens?.accessToken ?? '';
     const clientId = cfg.clientId ?? process.env.TWITCH_CLIENT_ID ?? BUNDLED_CLIENT_ID;
 
-    const res = await fetch(SUBSCRIPTION_API, {
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      'Client-Id': clientId,
+      'Content-Type': 'application/json',
+    };
+    const transport = { method: 'websocket', session_id: sessionId };
+
+    alertLogger.log('eventsub', 'subscribing', { broadcasterId, sessionId });
+
+    const redemptionRes = await fetch(SUBSCRIPTION_API, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Client-Id': clientId,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         type: 'channel.channel_points_custom_reward_redemption.add',
         version: '1',
         condition: { broadcaster_user_id: broadcasterId },
-        transport: { method: 'websocket', session_id: sessionId },
+        transport,
       }),
     });
 
-    if (res.status === 401) {
-      // Signal refresh needed — handled at higher level.
+    alertLogger.log('eventsub', 'redemption subscription response', { status: redemptionRes.status });
+
+    if (redemptionRes.status === 401) {
       this.emit('auth_error', new Error('401 from subscription endpoint'));
+      return;
+    }
+
+    // Follow events — requires moderator:read:followers scope.
+    // If scope missing (user authed before this feature), silently skip.
+    if (broadcasterId) {
+      try {
+        const followRes = await fetch(SUBSCRIPTION_API, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            type: 'channel.follow',
+            version: '2',
+            condition: { broadcaster_user_id: broadcasterId, moderator_user_id: broadcasterId },
+            transport,
+          }),
+        });
+        const followBody = await followRes.text();
+        alertLogger.log('eventsub', 'follow subscription response', { status: followRes.status, body: followBody });
+      } catch (e) {
+        alertLogger.log('eventsub', 'follow subscription error', { error: String(e) });
+      }
     }
   }
 
